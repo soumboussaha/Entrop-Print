@@ -345,7 +345,7 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   } else if (message.action === "getScriptCounts") {
     sendResponse({ counts: scriptCounts });
   } else if (message.action === "getLogs") {
-    sendResponse({ logs: logs.map(log => `\${log.timestamp} - \${log.lastAttribute} : \${log.scriptSource} : \${log.webpage}\`).join('\n'`) });
+    sendResponse({ logs: logs.map(log => `${log.timestamp} - ${log.lastAttribute} : ${log.scriptSource} : ${log.webpage}`).join('\n') });
   }
 });
 
