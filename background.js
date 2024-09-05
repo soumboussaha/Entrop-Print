@@ -3,7 +3,7 @@ console.log("background is loaded!");
 let entropyThreshold = 0.832; // Default value
 let currentMode = 'entropy'; // Default mode: 'entropy' or 'random'
 let entropies = {};
-
+let randomProfile = {};  // Will store the random profile received from content.js
 
 // Function to read entropy data from CSV
 function readCSVData() {
@@ -31,37 +31,27 @@ readCSVData().then(() => {
   console.log("Entropy data loaded and ready to be sent to content scripts");
 });
 
-
-
-
-
-function getEntropyThreshold(callback) {
-  browser.storage.local.get('entropyThreshold').then(data => {
-    const threshold = data.entropyThreshold;
-    if (threshold !== undefined) {
-      entropyThreshold = threshold;
-      callback(threshold);
-    } else {
-      callback(entropyThreshold);
+// HTTP header modification using webRequest API
+browser.webRequest.onBeforeSendHeaders.addListener(
+  function(details) {
+    for (let header of details.requestHeaders) {
+      if (header.name.toLowerCase() === 'user-agent' && randomProfile["navigator.userAgent"]) {
+        header.value = randomProfile["navigator.userAgent"];
+      }
+      if (header.name.toLowerCase() === 'accept-language' && randomProfile["navigator.language"]) {
+        header.value = randomProfile["navigator.language"];
+      }
+      if (header.name.toLowerCase() === 'dnt' && randomProfile["navigator.doNotTrack"]) {
+        header.value = randomProfile["navigator.doNotTrack"];
+      }
     }
-  });
-}
+    return { requestHeaders: details.requestHeaders };
+  },
+  { urls: ["<all_urls>"] },  // Intercept all outgoing requests
+  ["blocking", "requestHeaders"]
+);
 
-function setEntropyThreshold(threshold) {
-  entropyThreshold = threshold;
-  browser.storage.local.set({'entropyThreshold': threshold});
-  console.log('New threshold value set:', threshold);
-}
-
-function setMode(mode) {
-  currentMode = mode;
-  browser.storage.local.set({'currentMode': mode});
-  console.log('New mode set:', mode);
-}
-
-
-
-
+// Listener to handle messages from content.js
 function listenForMessages() {
   browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.getEntropyThreshold) {
@@ -81,6 +71,9 @@ function listenForMessages() {
     } else if (message.getEntropyData) {
       sendResponse({ entropies: entropies });
       return true;
+    } else if (message.action === "setRandomProfile") {
+      randomProfile = message.profile;  // Store the random profile received from content.js
+      sendResponse({ status: "Profile updated" });
     }
   });
 }
