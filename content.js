@@ -11,6 +11,7 @@ function getCurrentMode() {
   return new Promise((resolve) => {
     browser.runtime.sendMessage({ getMode: true }, response => {
       resolve(response.mode);
+      console.log("Applied Mode is "+response.mode);
     });
   });
 }
@@ -21,6 +22,7 @@ function requestEntropyThreshold() {
     browser.runtime.sendMessage({ getEntropyThreshold: true }, response => {
       if (response && response.threshold !== undefined) {
         entropyThreshold = response.threshold;
+        console.log("Applied Entropy is "+response.threshold);
         resolve();
       } else {
         reject('Failed to get entropy threshold');
