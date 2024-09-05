@@ -5,15 +5,16 @@ let entropies = {};
 let scriptCounts = { total: 0, firstParty: 0, thirdParty: 0 };
 let logs = [];
 let uniqueScripts = new Set();
+let randomProfile = {};
 
 function getCurrentMode() {
-    return new Promise((resolve) => {
-      browser.runtime.sendMessage({ getMode: true }, response => {
-        resolve(response.mode);
-      });
+  return new Promise((resolve) => {
+    browser.runtime.sendMessage({ getMode: true }, response => {
+      resolve(response.mode);
     });
-  }
-  
+  });
+}
+
 // Function to request entropy threshold from the background script
 function requestEntropyThreshold() {
   return new Promise((resolve, reject) => {
@@ -41,14 +42,14 @@ function getEntropyData() {
   });
 }
 
-
 // Function to inject the monitoring script
-function injectMonitoringScript(threshold, entropies) {
+function injectMonitoringScript(threshold, entropies, mode) {
   const scriptContent = `
     (function() {
       let entropyValues = ${JSON.stringify(entropies)};
       let entropyThreshold = ${threshold};
       let attributeAccessData = {};
+      let randomProfile = ${JSON.stringify(randomProfile)};
 
       function calculateVectorEntropy(attributes,scriptSource) {
         function normalizeVector(vector) {
@@ -85,7 +86,7 @@ function injectMonitoringScript(threshold, entropies) {
           }
           attributeAccessData[scriptSource].add(attribute);
           const attributes = Array.from(attributeAccessData[scriptSource]);
-          const vectorEntropy = calculateVectorEntropy(attributes,scriptSource);
+          const vectorEntropy = calculateVectorEntropy(attributes, scriptSource);
           allowAccess = vectorEntropy <= entropyThreshold;
 
           window.postMessage({
@@ -93,7 +94,7 @@ function injectMonitoringScript(threshold, entropies) {
             data: { lastAttribute: attribute, vector: attributes.join("|"), scriptSource, webpage: window.location.href, timestamp: new Date().toISOString() }
           }, '*');
 
-          if (allowAccess) {
+          if (allowAccess || "${mode}" === 'random') {
             return true;
           } else {
             logNewVector(attribute, attributes.join("|"), scriptSource);
@@ -123,7 +124,12 @@ function injectMonitoringScript(threshold, entropies) {
             const currentScript = scripts[scripts.length - 1];
             const scriptSource = currentScript ? (currentScript.src || window.location.href) : window.location.href;
             if (reportAccess(objName + '.' + prop, scriptSource)) {
-              return originalValue;
+              if ("${mode}" === 'random') {
+                // In random mode, return a dynamic value from the random profile
+                return randomProfile[objName + '.' + prop] || originalValue;
+              } else {
+                return originalValue;
+              }
             } else {
               return undefined;
             }
@@ -163,7 +169,11 @@ function injectMonitoringScript(threshold, entropies) {
                       const currentScript = scripts[scripts.length - 1];
                       const scriptSource = currentScript ? (currentScript.src || window.location.href) : window.location.href;
                       if (reportAccess(objName + '.' + prop, scriptSource)) {
-                        return originalGetter.call(this);
+                        if ("${mode}" === 'random') {
+                          return randomProfile[objName + '.' + prop] || originalGetter.call(this);
+                        } else {
+                          return originalGetter.call(this);
+                        }
                       } else {
                         return undefined;
                       }
@@ -219,50 +229,30 @@ async function main() {
     await getEntropyData();
     const mode = await getCurrentMode();
     await requestEntropyThreshold();
-    if (mode === 'entropy') {
-      injectMonitoringScript(entropyThreshold, entropies);
-    } else if (mode === 'random') {
-      applyRandomProfile();
+
+    // If random mode, generate the profile before injecting the script
+    if (mode === 'random') {
+      randomProfile = generateRandomProfile();
     }
+    
+    injectMonitoringScript(entropyThreshold, entropies, mode);
   } catch (error) {
     console.error('Error in main function:', error);
   }
 }
 
-function applyRandomProfile() {
-    // Implement your random profile logic here
-    console.log("Applying random profile");
-    // For example:
-    const randomProfile = generateRandomProfile();
-    injectRandomProfileScript(randomProfile);
-  }
-  
-  function generateRandomProfile() {
-    // Generate and return a random profile
-    // This is just an example,we adjust according to needs
-    return {
-      userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-      screenWidth: Math.floor(Math.random() * (1920 - 1024 + 1)) + 1024,
-      screenHeight: Math.floor(Math.random() * (1080 - 768 + 1)) + 768,
-      // Add more properties as needed
-    };
-  }
-  
-  function injectRandomProfileScript(profile) {
-    const scriptContent = `
-      (function() {
-        // Override properties with random profile
-        Object.defineProperty(screen, 'width', { value: ${profile.screenWidth} });
-        Object.defineProperty(screen, 'height', { value: ${profile.screenHeight} });
-        Object.defineProperty(navigator, 'userAgent', { value: "${profile.userAgent}" });
-        // Add more property overrides as needed
-      })();
-    `;
-    const script = document.createElement('script');
-    script.textContent = scriptContent;
-    document.documentElement.appendChild(script);
-    script.remove();
-  }
+function generateRandomProfile() {
+  return {
+    "screen.width": Math.floor(Math.random() * (1920 - 1024 + 1)) + 1024,
+    "screen.height": Math.floor(Math.random() * (1080 - 768 + 1)) + 768,
+    "navigator.userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+    "HTMLCanvasElement.toDataURL": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/wcAAgEB/wliKwAAAABJRU5ErkJggg==",  // example for canvas
+    "storage.quota": Math.floor(Math.random() * 5000) + 1000,    // example for storage quota
+    "Permissions.state": "granted",                             // example for permissions
+    "HTMLElement.offsetHeight": Math.floor(Math.random() * 1000) + 300,
+    "HTMLElement.offsetWidth": Math.floor(Math.random() * 1000) + 300
+  };
+}
 
 // Listen for messages from the injected script
 window.addEventListener('message', function(event) {
@@ -285,19 +275,19 @@ function updateScriptCounts(scriptSource) {
     browser.runtime.sendMessage({ action: "updateScriptCounts", counts: scriptCounts });
   }
 }
+
 // Listen for messages from the popup
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.action === "applyRandomProfile") {
-      applyRandomProfile();
-    } else if (message.action === "applyEntropyBlocking") {
-      entropyThreshold = message.threshold;
-      injectMonitoringScript(entropyThreshold, entropies);
-    } else if (message.action === "getScriptCounts") {
-      sendResponse({ counts: scriptCounts });
-    } else if (message.action === "getLogs") {
-      sendResponse({ logs: logs.map(log => `${log.timestamp} - ${log.lastAttribute} : ${log.scriptSource} : ${log.webpage}`).join('\n') });
+  if (message.action === "applyRandomProfile") {
+    applyRandomProfile();
+  } else if (message.action === "applyEntropyBlocking") {
+    entropyThreshold = message.threshold;
+    injectMonitoringScript(entropyThreshold, entropies);
+  } else if (message.action === "getScriptCounts") {
+    sendResponse({ counts: scriptCounts });
+  } else if (message.action === "getLogs") {
+    sendResponse({ logs: logs.map(log => \`\${log.timestamp} - \${log.lastAttribute} : \${log.scriptSource} : \${log.webpage}\`).join('\\n') });
+  }
+});
 
-    }
-  });
-  
-  main();
+main();
