@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Random Profile button click handler
   randomProfileBtn.addEventListener('click', function() {
-    entropyControls.style.display = 'none';
+    entropyControls.style.display = 'block';
     console.log('Random Profile selected');
     browser.runtime.sendMessage({ setMode: 'random' });
     applyToAllTabs('applyRandomProfile');
@@ -95,7 +95,7 @@ document.addEventListener('DOMContentLoaded', function() {
   // Request initial entropy threshold and mode from background script
   browser.runtime.sendMessage({ getEntropyThreshold: true }, function(response) {
     if (response && response.threshold !== undefined) {
-      currentThreshold = 1 - response.threshold;
+      currentThreshold = response.threshold;
       entropySlider.value = currentThreshold;
       entropyValue.textContent = `Entropy Threshold: ${currentThreshold}`;
     }
@@ -104,7 +104,7 @@ document.addEventListener('DOMContentLoaded', function() {
   browser.runtime.sendMessage({ getMode: true }, function(response) {
     if (response && response.mode) {
       if (response.mode === 'random') {
-        entropyControls.style.display = 'none';
+        entropyControls.style.display = 'block';
       } else {
         entropyControls.style.display = 'block';
       }
