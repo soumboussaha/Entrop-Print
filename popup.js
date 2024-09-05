@@ -10,16 +10,16 @@ document.addEventListener('DOMContentLoaded', function() {
   const thirdPartyScripts = document.getElementById('third-party-scripts');
 
   // Initialize entropy threshold
-  let currentThreshold = 0.5;
+  let currentThreshold = 0.832;
 
   // Function to update entropy threshold
   function updateEntropyThreshold(value) {
-    currentThreshold = 1 - value; // Invert the value
-    let blockingLevel = "Medium";
-    if (value <= 0.442) blockingLevel = "Negligible";
-    else if (value <= 0.596) blockingLevel = "Low";
-    else if (value <= 0.705) blockingLevel = "Medium";
-    else if (value <= 0.832) blockingLevel = "High";
+    currentThreshold = value; // Invert the value
+    let blockingLevel = "High";
+    if (value < 0.442) blockingLevel = "Negligible";
+    else if (value < 0.596) blockingLevel = "Low";
+    else if (value < 0.705) blockingLevel = "Medium";
+    else if (value < 0.832) blockingLevel = "High";
     else blockingLevel = "Very High";
     
     entropyValue.textContent = `Blocking Level: ${value} - ${blockingLevel}`;
