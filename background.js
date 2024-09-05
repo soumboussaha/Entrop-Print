@@ -78,10 +78,43 @@ function listenForMessages() {
   });
 }
 
+// Function to retrieve and set entropy threshold
+function getEntropyThreshold(callback) {
+  browser.storage.local.get('entropyThreshold').then(data => {
+    const threshold = data.entropyThreshold;
+    if (threshold !== undefined) {
+      entropyThreshold = threshold;
+      callback(threshold);
+    } else {
+      callback(entropyThreshold);
+    }
+  });
+}
+
+// Function to set a new entropy threshold
+function setEntropyThreshold(threshold) {
+  entropyThreshold = threshold;
+  browser.storage.local.set({'entropyThreshold': threshold});
+  console.log('New threshold value set:', threshold);
+}
+
+// Function to set a new mode
+function setMode(mode) {
+  currentMode = mode;
+  browser.storage.local.set({'currentMode': mode});
+  console.log('New mode set:', mode);
+}
+
 // Initialize mode from storage
 browser.storage.local.get('currentMode').then(data => {
   if (data.currentMode) {
     currentMode = data.currentMode;
+  }
+});
+
+// Start listening for messages
+listenForMessages();
+
   }
 });
 
