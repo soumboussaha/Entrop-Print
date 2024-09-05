@@ -49,8 +49,6 @@ function injectMonitoringScript(threshold, entropies) {
       let entropyValues = ${JSON.stringify(entropies)};
       let entropyThreshold = ${threshold};
       let attributeAccessData = {};
-      //console.log("Entropy values:", entropyValues);
-      //console.log("Entropy threshold:", entropyThreshold);
 
       function calculateVectorEntropy(attributes,scriptSource) {
         function normalizeVector(vector) {
@@ -65,13 +63,11 @@ function injectMonitoringScript(threshold, entropies) {
             }
           }
         }
-        // activate the logNewVector function for the automatic crawler to get data in a file !
-        //logNewVector(normalizedAttributes,scriptSource);
-        return 0.99; //change this to 0 (if the vector is unknown in our database 0.99 is blocking all unkown vectors)
+        return 0.99;
       }
 
-      function logNewVector(vector) {
-        const logEntry = vector + ' : ' + scriptSource + '\\n';
+      function logNewVector(attribute, vector, scriptSource) {
+        const logEntry = \`\${new Date().toISOString()} - Last accessed attribute: \${attribute} in vector: \${vector} : \${scriptSource}\\n\`;
         fetch('http://localhost:8000/Logvectors.txt', {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain' },
@@ -90,20 +86,17 @@ function injectMonitoringScript(threshold, entropies) {
           attributeAccessData[scriptSource].add(attribute);
           const attributes = Array.from(attributeAccessData[scriptSource]);
           const vectorEntropy = calculateVectorEntropy(attributes,scriptSource);
-         // console.log('Vector ', attributes.join("|"), ' entropy for', scriptSource, 'is:', vectorEntropy, ' and its:', entropyValues[attributes.join("|")]);
           allowAccess = vectorEntropy <= entropyThreshold;
-          
-          // Log the access attempt
+
           window.postMessage({
             type: 'FP_LOG',
-            data: { vector: attributes.join("|"), scriptSource, webpage: window.location.href }
+            data: { lastAttribute: attribute, vector: attributes.join("|"), scriptSource, webpage: window.location.href, timestamp: new Date().toISOString() }
           }, '*');
-          
+
           if (allowAccess) {
-           // console.log('Access allowed for attribute:', attribute, 'from script:', scriptSource);
             return true;
           } else {
-           // console.log('Access denied for attribute:', attribute, 'from script:', scriptSource);
+            logNewVector(attribute, attributes.join("|"), scriptSource);
             return false;
           }
         }
@@ -118,8 +111,6 @@ function injectMonitoringScript(threshold, entropies) {
           const scriptSource = currentScript ? (currentScript.src || window.location.href) : window.location.href;
           if (reportAccess(objName + '.' + method, scriptSource)) {
             return originalMethod.apply(this, arguments);
-          } else {
-           // console.log('Blocked access to method:', objName + '.' + method);
           }
         };
       }
@@ -157,76 +148,62 @@ function injectMonitoringScript(threshold, entropies) {
         }
       }
 
-    function hookAllPropertieswebgl(obj, objName) {
-            const excludeProps = ['canvas', 'drawingBufferWidth', 'drawingBufferHeight'];
-            for (let prop in obj) {
-                if (!excludeProps.includes(prop) && typeof obj[prop] !== 'function') {
-                try {
-                    // For WebGL properties, we need to use Object.getOwnPropertyDescriptor
-                    if (objName.includes('WebGLRenderingContext') || objName.includes('WebGL2RenderingContext')) {
-                    const descriptor = Object.getOwnPropertyDescriptor(obj, prop);
-                    if (descriptor && descriptor.get) {
-                        const originalGetter = descriptor.get;
-                        Object.defineProperty(obj, prop, {
-                        get: function() {
-                            const scripts = document.getElementsByTagName('script');
-                            const currentScript = scripts[scripts.length - 1];
-                            const scriptSource = currentScript ? (currentScript.src || window.location.href) : window.location.href;
-                            if (reportAccess(objName + '.' + prop, scriptSource)) {
-                            return originalGetter.call(this);
-                            } else {
-                            return undefined;
-                            }
-                        }
-                        });
+      function hookAllPropertieswebgl(obj, objName) {
+        const excludeProps = ['canvas', 'drawingBufferWidth', 'drawingBufferHeight'];
+        for (let prop in obj) {
+          if (!excludeProps.includes(prop) && typeof obj[prop] !== 'function') {
+            try {
+              if (objName.includes('WebGLRenderingContext') || objName.includes('WebGL2RenderingContext')) {
+                const descriptor = Object.getOwnPropertyDescriptor(obj, prop);
+                if (descriptor && descriptor.get) {
+                  const originalGetter = descriptor.get;
+                  Object.defineProperty(obj, prop, {
+                    get: function() {
+                      const scripts = document.getElementsByTagName('script');
+                      const currentScript = scripts[scripts.length - 1];
+                      const scriptSource = currentScript ? (currentScript.src || window.location.href) : window.location.href;
+                      if (reportAccess(objName + '.' + prop, scriptSource)) {
+                        return originalGetter.call(this);
+                      } else {
+                        return undefined;
+                      }
                     }
-                    } else {
-                    hookProperty(obj, prop, objName);
-                    }
-                } catch (error) {
-                    console.log(error);
+                  });
                 }
-                }
+              } else {
+                hookProperty(obj, prop, objName);
+              }
+            } catch (error) {
+              console.log(error);
             }
-            }
-
-        hookAllProperties(screen, 'screen');
-        hookAllProperties(navigator, 'navigator');
-        hookProperty(HTMLCanvasElement.prototype, 'toDataURL', 'HTMLCanvasElement');
-
-        // Hook history.length
-        hookProperty(history, 'length', 'history');
-        hookProperty(WebGLShaderPrecisionFormat.prototype, 'precision', 'WebGLShaderPrecisionFormat');
-        hookProperty(WebGLShaderPrecisionFormat.prototype, 'rangeMax', 'WebGLShaderPrecisionFormat');
-        hookProperty(WebGLShaderPrecisionFormat.prototype, 'rangeMin', 'WebGLShaderPrecisionFormat');
-
-
-
-        if (window.WebGLRenderingContext) {
-          hookAllPropertieswebgl(WebGLRenderingContext, 'WebGLRenderingContext');
+          }
         }
-        if (window.WebGL2RenderingContext) {
-          hookAllPropertieswebgl(WebGL2RenderingContext, 'WebGL2RenderingContext');
-        }
+      }
 
+      // Hook required properties
+      hookAllProperties(screen, 'screen');
+      hookAllProperties(navigator, 'navigator');
+      hookProperty(HTMLCanvasElement.prototype, 'toDataURL', 'HTMLCanvasElement');
+      hookProperty(history, 'length', 'history');
+      hookProperty(WebGLShaderPrecisionFormat.prototype, 'precision', 'WebGLShaderPrecisionFormat');
+      hookProperty(WebGLShaderPrecisionFormat.prototype, 'rangeMax', 'WebGLShaderPrecisionFormat');
+      hookProperty(WebGLShaderPrecisionFormat.prototype, 'rangeMin', 'WebGLShaderPrecisionFormat');
 
-      if (window.BaseAudioContext) {
-        hookProperty(BaseAudioContext.prototype, 'sampleRate', 'BaseAudioContext');
-        hookProperty(BaseAudioContext.prototype, 'currentTime', 'BaseAudioContext');
-        hookProperty(BaseAudioContext.prototype, 'state', 'BaseAudioContext');
+      if (window.WebGLRenderingContext) {
+        hookAllPropertieswebgl(WebGLRenderingContext, 'WebGLRenderingContext');
       }
-      if (window.AudioContext) {
-        hookProperty(AudioContext.prototype, 'baseLatency', 'AudioContext');
-        hookProperty(AudioContext.prototype, 'outputLatency', 'AudioContext');
+      if (window.WebGL2RenderingContext) {
+        hookAllPropertieswebgl(WebGL2RenderingContext, 'WebGL2RenderingContext');
       }
-      if (window.AudioDestinationNode) {
-        hookProperty(AudioDestinationNode.prototype, 'maxChannelCount', 'AudioDestinationNode');
+
+      // Hook newly requested attributes
+      hookProperty(storage, 'quota', 'storage');
+      if (window.Permissions) {
+        hookProperty(Permissions.prototype, 'state', 'Permissions');
       }
-      if (window.AudioNode) {
-        hookProperty(AudioNode.prototype, 'channelCount', 'AudioNode');
-        hookProperty(AudioNode.prototype, 'numberOfInputs', 'AudioNode');
-        hookProperty(AudioNode.prototype, 'numberOfOutputs', 'AudioNode');
-      }
+      hookProperty(HTMLElement.prototype, 'offsetHeight', 'HTMLElement');
+      hookProperty(HTMLElement.prototype, 'offsetWidth', 'HTMLElement');
+
     })();
   `;
 
@@ -318,7 +295,8 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     } else if (message.action === "getScriptCounts") {
       sendResponse({ counts: scriptCounts });
     } else if (message.action === "getLogs") {
-      sendResponse({ logs: logs.map(log => `${log.vector} : ${log.scriptSource} : ${log.webpage}`).join('\n') });
+      sendResponse({ logs: logs.map(log => `${log.timestamp} - ${log.lastAttribute} : ${log.scriptSource} : ${log.webpage}`).join('\n') });
+
     }
   });
   
