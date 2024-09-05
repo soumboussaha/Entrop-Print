@@ -241,6 +241,7 @@ async function main() {
   }
 }
 
+// Random profile generation for WebGL, plugins, platform, and languages
 function generateRandomProfile() {
   return {
     "screen.width": Math.floor(Math.random() * (1920 - 1024 + 1)) + 1024,
@@ -250,8 +251,59 @@ function generateRandomProfile() {
     "storage.quota": Math.floor(Math.random() * 5000) + 1000,    // example for storage quota
     "Permissions.state": "granted",                             // example for permissions
     "HTMLElement.offsetHeight": Math.floor(Math.random() * 1000) + 300,
-    "HTMLElement.offsetWidth": Math.floor(Math.random() * 1000) + 300
+    "HTMLElement.offsetWidth": Math.floor(Math.random() * 1000) + 300,
+    "navigator.platform": generateRandomPlatform(),
+    "navigator.language": generateRandomLanguage(),
+    "navigator.languages": generateRandomLanguages(),
+    "navigator.plugins": generateRandomPlugins(),
+    "WebGLRenderingContext.UNMASKED_RENDERER_WEBGL": generateRandomWebGLRenderer(),
+    "WebGLRenderingContext.UNMASKED_VENDOR_WEBGL": generateRandomWebGLVendor(),
   };
+}
+
+function generateRandomPlatform() {
+  const platforms = ["Win32", "MacIntel", "Linux x86_64", "iPhone", "iPad"];
+  return platforms[Math.floor(Math.random() * platforms.length)];
+}
+
+function generateRandomLanguage() {
+  const languages = ["en-US", "fr-FR", "es-ES", "de-DE", "zh-CN"];
+  return languages[Math.floor(Math.random() * languages.length)];
+}
+
+function generateRandomLanguages() {
+  const languageOptions = [
+    ["en-US", "en"],
+    ["fr-FR", "fr"],
+    ["es-ES", "es"],
+    ["de-DE", "de"],
+    ["zh-CN", "zh"]
+  ];
+  return languageOptions[Math.floor(Math.random() * languageOptions.length)];
+}
+
+function generateRandomPlugins() {
+  const plugins = [
+    { name: "Shockwave Flash", filename: "flashplayer.xpt", description: "Shockwave Flash 32.0 r0" },
+    { name: "Chrome PDF Viewer", filename: "internal-pdf-viewer", description: "Portable Document Format" },
+    { name: "Widevine Content Decryption Module", filename: "widevinecdm.dll", description: "Content Decryption Module" },
+  ];
+  const randomPlugins = [];
+  const pluginCount = Math.floor(Math.random() * plugins.length);
+  for (let i = 0; i <= pluginCount; i++) {
+    randomPlugins.push(plugins[i]);
+  }
+  return randomPlugins;
+}
+
+function generateRandomWebGLRenderer() {
+  const renderers = ["ANGLE (Intel(R) UHD Graphics Direct3D11 vs_5_0 ps_5_0)", "AMD Radeon Pro 560X OpenGL Engine", "Apple M1"];
+  return renderers[Math.floor(Math.random() * renderers.length)];
+}
+
+function generateRandomWebGLVendor() {
+  const vendors = ["Google Inc.", "Intel Inc.", "ATI Technologies Inc."];
+  return vendors[Math.floor(Math.random() * vendors.length)];
 }
 
 // Listen for messages from the injected script
