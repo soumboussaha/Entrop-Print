@@ -241,18 +241,19 @@ async function main() {
   }
 }
 
-// Random profile generation for WebGL, plugins, platform, and languages
+// Random profile generation for WebGL, plugins, platform, userAgent, and languages
 function generateRandomProfile() {
+  const { platform, userAgent } = generateConsistentPlatformAndUserAgent();
   return {
     "screen.width": Math.floor(Math.random() * (1920 - 1024 + 1)) + 1024,
     "screen.height": Math.floor(Math.random() * (1080 - 768 + 1)) + 768,
-    "navigator.userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+    "navigator.userAgent": userAgent,
+    "navigator.platform": platform,
     "HTMLCanvasElement.toDataURL": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/wcAAgEB/wliKwAAAABJRU5ErkJggg==",  // example for canvas
     "storage.quota": Math.floor(Math.random() * 5000) + 1000,    // example for storage quota
     "Permissions.state": "granted",                             // example for permissions
     "HTMLElement.offsetHeight": Math.floor(Math.random() * 1000) + 300,
     "HTMLElement.offsetWidth": Math.floor(Math.random() * 1000) + 300,
-    "navigator.platform": generateRandomPlatform(),
     "navigator.language": generateRandomLanguage(),
     "navigator.languages": generateRandomLanguages(),
     "navigator.plugins": generateRandomPlugins(),
@@ -261,9 +262,15 @@ function generateRandomProfile() {
   };
 }
 
-function generateRandomPlatform() {
-  const platforms = ["Win32", "MacIntel", "Linux x86_64", "iPhone", "iPad"];
-  return platforms[Math.floor(Math.random() * platforms.length)];
+function generateConsistentPlatformAndUserAgent() {
+  const browsers = [
+    { name: "Chrome", version: "91.0.4472.124", platform: "Win32", userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36" },
+    { name: "Firefox", version: "89.0", platform: "Linux x86_64", userAgent: "Mozilla/5.0 (X11; Linux x86_64; rv:89.0) Gecko/20100101 Firefox/89.0" },
+    { name: "Safari", version: "14.0", platform: "MacIntel", userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Safari/605.1.15" },
+    { name: "Edge", version: "91.0", platform: "Win32", userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36 Edg/91.0.864.59" }
+  ];
+  const randomBrowser = browsers[Math.floor(Math.random() * browsers.length)];
+  return { platform: randomBrowser.platform, userAgent: randomBrowser.userAgent };
 }
 
 function generateRandomLanguage() {
@@ -338,7 +345,7 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   } else if (message.action === "getScriptCounts") {
     sendResponse({ counts: scriptCounts });
   } else if (message.action === "getLogs") {
-    sendResponse({ logs: logs.map(log => \`\${log.timestamp} - \${log.lastAttribute} : \${log.scriptSource} : \${log.webpage}\`).join('\\n') });
+    sendResponse({ logs: logs.map(log => `\${log.timestamp} - \${log.lastAttribute} : \${log.scriptSource} : \${log.webpage}\`).join('\n') });
   }
 });
 
