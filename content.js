@@ -11,7 +11,7 @@ function getCurrentMode() {
   return new Promise((resolve) => {
     browser.runtime.sendMessage({ getMode: true }, response => {
       resolve(response.mode);
-      console.log("Applied Mode is "+response.mode);
+      console.log("Applied Mode is " + response.mode);
     });
   });
 }
@@ -22,7 +22,7 @@ function requestEntropyThreshold() {
     browser.runtime.sendMessage({ getEntropyThreshold: true }, response => {
       if (response && response.threshold !== undefined) {
         entropyThreshold = response.threshold;
-        console.log("Applied Entropy is "+response.threshold);
+        console.log("Applied Entropy is " + response.threshold);
         resolve();
       } else {
         reject('Failed to get entropy threshold');
@@ -52,8 +52,9 @@ function injectMonitoringScript(threshold, entropies, mode) {
       let entropyThreshold = ${threshold};
       let attributeAccessData = {};
       let randomProfile = ${JSON.stringify(randomProfile)};
+      let scriptsExceedingThreshold = new Set();
 
-      function calculateVectorEntropy(attributes,scriptSource) {
+      function calculateVectorEntropy(attributes, scriptSource) {
         function normalizeVector(vector) {
           return vector.split('|').map(attr => attr.trim()).sort().join('|');
         }
@@ -66,11 +67,11 @@ function injectMonitoringScript(threshold, entropies, mode) {
             }
           }
         }
-        return 0.99;
+        return 0.99; // Default entropy if not found in the database
       }
 
-      function logNewVector(attribute, vector, scriptSource) {
-        const logEntry = \`\${new Date().toISOString()} - Last accessed attribute: \${attribute} in vector: \${vector} : \${scriptSource}\\n\`;
+      function logNewVector(attribute, vector, scriptSource, entropy) {
+        const logEntry = \`\${new Date().toISOString()} - Last accessed attribute: \${attribute}, Vector: \${vector}, Script source: \${scriptSource}, Detected entropy: \${entropy}\\n\`;
         fetch('http://localhost:8000/Logvectors.txt', {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain' },
@@ -89,19 +90,30 @@ function injectMonitoringScript(threshold, entropies, mode) {
           attributeAccessData[scriptSource].add(attribute);
           const attributes = Array.from(attributeAccessData[scriptSource]);
           const vectorEntropy = calculateVectorEntropy(attributes, scriptSource);
+          console.log(\`Detected entropy for vector [\${attributes.join("|")}] from script [\${scriptSource}]: \${vectorEntropy}\`);
+
+          // Log the entropy of the accessed vector
+          logNewVector(attribute, attributes.join("|"), scriptSource, vectorEntropy);
+
           allowAccess = vectorEntropy <= entropyThreshold;
+
+          if (!allowAccess && !scriptsExceedingThreshold.has(scriptSource)) {
+            scriptsExceedingThreshold.add(scriptSource);
+            updateScriptCounts(scriptSource);
+          }
 
           window.postMessage({
             type: 'FP_LOG',
             data: { lastAttribute: attribute, vector: attributes.join("|"), scriptSource, webpage: window.location.href, timestamp: new Date().toISOString() }
           }, '*');
 
-          if (allowAccess || "${mode}" === 'random') {
+          // Randomize only if the entropy threshold is exceeded
+          if (!allowAccess && "${mode}" === 'random') {
+            console.log('Randomizing access for attribute:', attribute, 'in random mode due to entropy exceeding threshold');
             return true;
-          } else {
-            logNewVector(attribute, attributes.join("|"), scriptSource);
-            return false;
           }
+
+          return allowAccess;
         }
         return false;
       }
@@ -127,7 +139,7 @@ function injectMonitoringScript(threshold, entropies, mode) {
             const scriptSource = currentScript ? (currentScript.src || window.location.href) : window.location.href;
             if (reportAccess(objName + '.' + prop, scriptSource)) {
               if ("${mode}" === 'random') {
-                // In random mode, return a dynamic value from the random profile
+                // In random mode, return a dynamic value from the random profile if entropy exceeds threshold
                 return randomProfile[objName + '.' + prop] || originalValue;
               } else {
                 return originalValue;
@@ -323,7 +335,7 @@ window.addEventListener('message', function(event) {
   }
 });
 
-// Function to update script counts
+// Function to update script counts only when the entropy threshold is exceeded
 function updateScriptCounts(scriptSource) {
   if (!uniqueScripts.has(scriptSource)) {
     uniqueScripts.add(scriptSource);
@@ -347,8 +359,9 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   } else if (message.action === "getScriptCounts") {
     sendResponse({ counts: scriptCounts });
   } else if (message.action === "getLogs") {
-    sendResponse({ logs: logs.map(log => `${log.timestamp} - ${log.lastAttribute} : ${log.scriptSource} : ${log.webpage}`).join('\n') });
+    sendResponse({ logs: logs.map(log => \`\${log.timestamp} - \${log.lastAttribute} : \${log.scriptSource} : \${log.webpage}\`).join('\\n') });
   }
 });
 
 main();
+
