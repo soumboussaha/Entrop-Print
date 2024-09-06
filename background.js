@@ -1,3 +1,4 @@
+
 console.log("background is loaded!");
 
 let entropyThreshold = 0.83; // Default value
