@@ -23,6 +23,31 @@ function generateRandomProfile() {
   };
 }
 
+
+function setEntropyThreshold(threshold) {
+  entropyThreshold = threshold;
+  browser.storage.local.set({'entropyThreshold': threshold});
+  console.log('New threshold value set:', threshold);
+}
+
+function setMode(mode) {
+  currentMode = mode;
+  browser.storage.local.set({'currentMode': mode});
+  console.log('New mode set:', mode);
+}
+
+function getEntropyThreshold(callback) {
+  browser.storage.local.get('entropyThreshold').then(data => {
+    const threshold = data.entropyThreshold;
+    if (threshold !== undefined) {
+      entropyThreshold = threshold;
+      callback(threshold);
+    } else {
+      callback(entropyThreshold);
+    }
+  });
+}
+
 // Generate random language
 function generateRandomLanguage() {
   const languages = ["en-US", "fr-FR", "es-ES", "de-DE", "zh-CN"];
