@@ -1,5 +1,4 @@
 
-
 console.log("Content script loaded successfully!");
 
 let entropyThreshold;
