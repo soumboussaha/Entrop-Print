@@ -81,8 +81,9 @@ browser.webRequest.onBeforeSendHeaders.addListener(
 function getRandomProfile(callback) {
   browser.storage.local.get('randomProfile').then(data => {
     if (data.randomProfile) {
-      randomProfile = data.randomProfile;
-      callback(randomProfile);
+      callback(data.randomProfile);  // Pass the profile to the callback
+    } else {
+      callback({});  // If there's no random profile, return an empty object
     }
   });
 }
@@ -108,8 +109,10 @@ function listenForMessages() {
       sendResponse({ entropies: entropies });
       return true;
     } else if (message.getRandomProfile) {
-      getRandomProfile(profile => sendResponse({ profile: profile }));
-      return true;
+      getRandomProfile(profile => {
+        sendResponse({ profile: profile });  // Now send the profile properly
+      });
+      return true;  // This keeps the message channel open for async response
     }
   });
 }
