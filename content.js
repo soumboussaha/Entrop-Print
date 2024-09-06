@@ -1,4 +1,3 @@
-
 console.log("Content script loaded successfully!");
 
 let entropyThreshold;
@@ -6,14 +5,19 @@ let entropies = {};
 let scriptCounts = { total: 0, firstParty: 0, thirdParty: 0 };
 let logs = [];
 let uniqueScripts = new Set();
-let randomProfile = {}; // Store the random profile received from background.js
+let randomProfile = {};  // To store the random profile from background.js
 
-// Function to get the current mode (random or entropy)
-function getCurrentMode() {
+// Function to retrieve the random profile from background.js
+function getRandomProfileFromBackground() {
   return new Promise((resolve) => {
-    browser.runtime.sendMessage({ getMode: true }, response => {
-      resolve(response.mode);
-      console.log("Applied Mode is " + response.mode);
+    browser.runtime.sendMessage({ getRandomProfile: true }, response => {
+      if (response.profile) {
+        randomProfile = response.profile;
+        resolve(randomProfile);
+      } else {
+        console.error("Failed to get random profile from background.js");
+        resolve(null);
+      }
     });
   });
 }
@@ -33,16 +37,14 @@ function requestEntropyThreshold() {
   });
 }
 
-// Function to get random profile from background (userAgent, platform)
-function getRandomProfileFromBackground() {
+function getEntropyData() {
   return new Promise((resolve, reject) => {
-    browser.runtime.sendMessage({ action: "getRandomProfile" }, response => {
-      if (response && response.profile) {
-        randomProfile = response.profile;
-        console.log("Received random profile from background:", randomProfile);
-        resolve(randomProfile);
+    browser.storage.local.get('entropyData').then(data => {
+      if (data.entropyData) {
+        entropies = data.entropyData;
+        resolve();
       } else {
-        reject("Failed to get random profile from background");
+        reject('Failed to get entropy data from local storage');
       }
     });
   });
@@ -143,12 +145,8 @@ function injectMonitoringScript(threshold, entropies, mode) {
             const scriptSource = currentScript ? (currentScript.src || window.location.href) : window.location.href;
             if (reportAccess(objName + '.' + prop, scriptSource)) {
               if ("${mode}" === 'random') {
-                // Return platform and userAgent from background.js, randomize others
-                if (objName + '.' + prop === 'navigator.userAgent' || objName + '.' + prop === 'navigator.platform') {
-                  return randomProfile[objName + '.' + prop]; // Consistent across tabs
-                } else {
-                  return randomProfile[objName + '.' + prop] || originalValue; // Local randomization
-                }
+                // In random mode, return a dynamic value from the random profile if entropy exceeds threshold
+                return randomProfile[objName + '.' + prop] || originalValue;
               } else {
                 return originalValue;
               }
@@ -252,10 +250,8 @@ async function main() {
     const mode = await getCurrentMode();
     await requestEntropyThreshold();
 
-    // Get the consistent random profile (userAgent, platform) from background
-    if (mode === 'random') {
-      await getRandomProfileFromBackground();
-    }
+    // Retrieve random profile from background.js
+    const randomProfile = await getRandomProfileFromBackground();
 
     injectMonitoringScript(entropyThreshold, entropies, mode);
   } catch (error) {
@@ -263,7 +259,15 @@ async function main() {
   }
 }
 
-// Logging original functionalities
+// Listen for messages from the injected script
+window.addEventListener('message', function(event) {
+  if (event.data.type === 'FP_LOG') {
+    logs.push(event.data.data);
+    updateScriptCounts(event.data.data.scriptSource);
+  }
+});
+
+// Function to update script counts only when the entropy threshold is exceeded
 function updateScriptCounts(scriptSource) {
   if (!uniqueScripts.has(scriptSource)) {
     uniqueScripts.add(scriptSource);
