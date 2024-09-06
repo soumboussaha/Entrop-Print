@@ -1,9 +1,9 @@
 console.log("background is loaded!");
 
-let entropyThreshold = 0.832; // Default value
+let entropyThreshold = 0.5; // Default value
 let currentMode = 'entropy'; // Default mode: 'entropy' or 'random'
 let entropies = {};
-let randomProfile = {};  // Will store the random profile received from content.js
+
 
 // Function to read entropy data from CSV
 function readCSVData() {
@@ -30,6 +30,32 @@ function readCSVData() {
 readCSVData().then(() => {
   console.log("Entropy data loaded and ready to be sent to content scripts");
 });
+
+
+function getEntropyThreshold(callback) {
+  browser.storage.local.get('entropyThreshold').then(data => {
+    const threshold = data.entropyThreshold;
+    if (threshold !== undefined) {
+      entropyThreshold = threshold;
+      callback(threshold);
+    } else {
+      callback(entropyThreshold);
+    }
+  });
+}
+
+function setEntropyThreshold(threshold) {
+  entropyThreshold = threshold;
+  browser.storage.local.set({'entropyThreshold': threshold});
+  console.log('New threshold value set:', threshold);
+}
+
+function setMode(mode) {
+  currentMode = mode;
+  browser.storage.local.set({'currentMode': mode});
+  console.log('New mode set:', mode);
+}
+
 
 // HTTP header modification using webRequest API
 browser.webRequest.onBeforeSendHeaders.addListener(
@@ -76,46 +102,8 @@ function listenForMessages() {
       sendResponse({ status: "Profile updated" });
     }
   });
-}
-
-// Function to retrieve and set entropy threshold
-function getEntropyThreshold(callback) {
-  browser.storage.local.get('entropyThreshold').then(data => {
-    const threshold = data.entropyThreshold;
-    if (threshold !== undefined) {
-      entropyThreshold = threshold;
-      callback(threshold);
-    } else {
-      callback(entropyThreshold);
-    }
-  });
-}
-
-// Function to set a new entropy threshold
-function setEntropyThreshold(threshold) {
-  entropyThreshold = threshold;
-  browser.storage.local.set({'entropyThreshold': threshold});
-  console.log('New threshold value set:', threshold);
-}
-
-// Function to set a new mode
-function setMode(mode) {
-  currentMode = mode;
-  browser.storage.local.set({'currentMode': mode});
-  console.log('New mode set:', mode);
-}
-
-// Initialize mode from storage
+} // Initialize mode from storage
 browser.storage.local.get('currentMode').then(data => {
   if (data.currentMode) {
     currentMode = data.currentMode;
-  }
-});
-
-// Start listening for messages
-listenForMessages();
-
-  }
-});
-
-listenForMessages();
+  }});listenForMessages();
