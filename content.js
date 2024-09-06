@@ -7,12 +7,14 @@ let logs = [];
 let uniqueScripts = new Set();
 let randomProfile = {};  // To store the random profile from background.js
 
-// Function to retrieve the random profile from background.js
+// Function to retrieve the random profile (only userAgent and platform) from the background script
 function getRandomProfileFromBackground() {
   return new Promise((resolve, reject) => {
     browser.runtime.sendMessage({ getRandomProfile: true }, response => {
       if (response && response.profile) {
-        randomProfile = response.profile;
+        // Set userAgent and platform from the background
+        randomProfile.navigatorUserAgent = response.profile["navigator.userAgent"];
+        randomProfile.navigatorPlatform = response.profile["navigator.platform"];
         resolve(randomProfile);
       } else {
         console.error("Failed to get random profile from background.js", response);
@@ -59,7 +61,7 @@ function getEntropyData() {
   });
 }
 
-// Function to inject the monitoring script
+// Function to inject the monitoring script and randomize properties
 function injectMonitoringScript(threshold, entropies, mode) {
   const scriptContent = `
     (function() {
@@ -107,7 +109,6 @@ function injectMonitoringScript(threshold, entropies, mode) {
           const vectorEntropy = calculateVectorEntropy(attributes, scriptSource);
           console.log(\`Detected entropy for vector [\${attributes.join("|")}] from script [\${scriptSource}]: \${vectorEntropy}\`);
 
-          // Log the entropy of the accessed vector
           logNewVector(attribute, attributes.join("|"), scriptSource, vectorEntropy);
 
           allowAccess = vectorEntropy <= entropyThreshold;
@@ -122,7 +123,6 @@ function injectMonitoringScript(threshold, entropies, mode) {
             data: { lastAttribute: attribute, vector: attributes.join("|"), scriptSource, webpage: window.location.href, timestamp: new Date().toISOString() }
           }, '*');
 
-          // Randomize only if the entropy threshold is exceeded
           if (!allowAccess && "${mode}" === 'random') {
             console.log('Randomizing access for attribute:', attribute, 'in random mode due to entropy exceeding threshold');
             return true;
@@ -154,7 +154,6 @@ function injectMonitoringScript(threshold, entropies, mode) {
             const scriptSource = currentScript ? (currentScript.src || window.location.href) : window.location.href;
             if (reportAccess(objName + '.' + prop, scriptSource)) {
               if ("${mode}" === 'random') {
-                // In random mode, return a dynamic value from the random profile if entropy exceeds threshold
                 return randomProfile[objName + '.' + prop] || originalValue;
               } else {
                 return originalValue;
@@ -235,7 +234,6 @@ function injectMonitoringScript(threshold, entropies, mode) {
         hookAllPropertieswebgl(WebGL2RenderingContext, 'WebGL2RenderingContext');
       }
 
-      // Hook newly requested attributes
       hookProperty(storage, 'quota', 'storage');
       if (window.Permissions) {
         hookProperty(Permissions.prototype, 'state', 'Permissions');
@@ -259,13 +257,70 @@ async function main() {
     const mode = await getCurrentMode();
     await requestEntropyThreshold();
 
-    // Retrieve random profile from background.js
-    const randomProfile = await getRandomProfileFromBackground();
+    // Get userAgent and platform from background.js and generate rest in content.js
+    randomProfile = await getRandomProfileFromBackground();
+
+    // Generate other randomized values in content.js for WebGL, screen, etc.
+    const generatedProfile = generateRandomProfile();
+    randomProfile = { ...randomProfile, ...generatedProfile };
 
     injectMonitoringScript(entropyThreshold, entropies, mode);
   } catch (error) {
     console.error('Error in main function:', error);
   }
+}
+
+// Random profile generation (except userAgent and platform, which are from background.js)
+function generateRandomProfile() {
+  return {
+    "screen.width": Math.floor(Math.random() * (1920 - 1024 + 1)) + 1024,
+    "screen.height": Math.floor(Math.random() * (1080 - 768 + 1)) + 768,
+    "HTMLCanvasElement.toDataURL": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/wcAAgEB/wliKwAAAABJRU5ErkJggg==",
+    "storage.quota": Math.floor(Math.random() * 5000) + 1000,
+    "Permissions.state": "granted",
+    "HTMLElement.offsetHeight": Math.floor(Math.random() * 1000) + 300,
+    "HTMLElement.offsetWidth": Math.floor(Math.random() * 1000) + 300,
+    "navigator.language": generateRandomLanguage(),
+    "navigator.languages": generateRandomLanguages(),
+    "navigator.plugins": generateRandomPlugins(),
+    "WebGLRenderingContext.UNMASKED_RENDERER_WEBGL": generateRandomWebGLRenderer(),
+    "WebGLRenderingContext.UNMASKED_VENDOR_WEBGL": generateRandomWebGLVendor(),
+  };
+}
+
+function generateRandomLanguage() {
+  const languages = ["en-US", "fr-FR", "es-ES", "de-DE", "zh-CN"];
+  return languages[Math.floor(Math.random() * languages.length)];
+}
+
+function generateRandomLanguages() {
+  const languageOptions = [
+    ["en-US", "en"],
+    ["fr-FR", "fr"],
+    ["es-ES", "es"],
+    ["de-DE", "de"],
+    ["zh-CN", "zh"]
+  ];
+  return languageOptions[Math.floor(Math.random() * languageOptions.length)];
+}
+
+function generateRandomPlugins() {
+  const plugins = [
+    { name: "Shockwave Flash", filename: "flashplayer.xpt", description: "Shockwave Flash 32.0 r0" },
+    { name: "Chrome PDF Viewer", filename: "internal-pdf-viewer", description: "Portable Document Format" },
+    { name: "Widevine Content Decryption Module", filename: "widevinecdm.dll", description: "Content Decryption Module" },
+  ];
+  return plugins.slice(0, Math.floor(Math.random() * plugins.length) + 1);
+}
+
+function generateRandomWebGLRenderer() {
+  const renderers = ["ANGLE (Intel(R) UHD Graphics Direct3D11 vs_5_0 ps_5_0)", "AMD Radeon Pro 560X OpenGL Engine", "Apple M1"];
+  return renderers[Math.floor(Math.random() * renderers.length)];
+}
+
+function generateRandomWebGLVendor() {
+  const vendors = ["Google Inc.", "Intel Inc.", "ATI Technologies Inc."];
+  return vendors[Math.floor(Math.random() * vendors.length)];
 }
 
 // Listen for messages from the injected script
@@ -300,7 +355,7 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   } else if (message.action === "getScriptCounts") {
     sendResponse({ counts: scriptCounts });
   } else if (message.action === "getLogs") {
-    sendResponse({ logs: logs.map(log => `${log.timestamp} - ${log.lastAttribute} : ${log.scriptSource} : ${log.webpage}`).join('\n') });
+    sendResponse({ logs: logs.map(log => \`\${log.timestamp} - \${log.lastAttribute} : \${log.scriptSource} : \${log.webpage}\`).join('\\n') });
   }
 });
 
