@@ -9,18 +9,19 @@ let randomProfile = {};  // To store the random profile from background.js
 
 // Function to retrieve the random profile from background.js
 function getRandomProfileFromBackground() {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     browser.runtime.sendMessage({ getRandomProfile: true }, response => {
-      if (response.profile) {
+      if (response && response.profile) {
         randomProfile = response.profile;
         resolve(randomProfile);
       } else {
-        console.error("Failed to get random profile from background.js");
-        resolve(null);
+        console.error("Failed to get random profile from background.js", response);
+        reject('No profile received from background.js');
       }
     });
   });
 }
+
 
 
 function getCurrentMode() {
