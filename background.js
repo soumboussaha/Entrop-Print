@@ -5,6 +5,29 @@ let currentMode = 'entropy'; // Default mode: 'entropy' or 'random'
 let entropies = {};
 let randomProfile = {};
 
+// Function to generate a random user-agent, platform, and other header values
+function generateRandomProfile() {
+  const browsers = [
+    { name: "Chrome", version: "91.0", platform: "Win32", userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0 Safari/537.36" },
+    { name: "Firefox", version: "89.0", platform: "Linux x86_64", userAgent: "Mozilla/5.0 (X11; Linux x86_64; rv:89.0) Gecko/20100101 Firefox/89.0" },
+    { name: "Safari", version: "14.0", platform: "MacIntel", userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Safari/605.1.15" },
+    { name: "Edge", version: "91.0", platform: "Win32", userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0 Safari/537.36 Edg/91.0" }
+  ];
+  const randomBrowser = browsers[Math.floor(Math.random() * browsers.length)];
+  return {
+    "navigator.userAgent": randomBrowser.userAgent,
+    "navigator.platform": randomBrowser.platform,
+    "navigator.language": generateRandomLanguage(),
+    "navigator.doNotTrack": Math.random() > 0.5 ? "1" : "0"
+  };
+}
+
+// Generate random language
+function generateRandomLanguage() {
+  const languages = ["en-US", "fr-FR", "es-ES", "de-DE", "zh-CN"];
+  return languages[Math.floor(Math.random() * languages.length)];
+}
+
 // Function to read entropy data from CSV
 function readCSVData() {
   return fetch(browser.runtime.getURL("./data/Entropy.csv"))
@@ -30,30 +53,6 @@ function readCSVData() {
 readCSVData().then(() => {
   console.log("Entropy data loaded and ready to be sent to content scripts");
 });
-
-function getEntropyThreshold(callback) {
-  browser.storage.local.get('entropyThreshold').then(data => {
-    const threshold = data.entropyThreshold;
-    if (threshold !== undefined) {
-      entropyThreshold = threshold;
-      callback(threshold);
-    } else {
-      callback(entropyThreshold);
-    }
-  });
-}
-
-function setEntropyThreshold(threshold) {
-  entropyThreshold = threshold;
-  browser.storage.local.set({ 'entropyThreshold': threshold });
-  console.log('New threshold value set:', threshold);
-}
-
-function setMode(mode) {
-  currentMode = mode;
-  browser.storage.local.set({ 'currentMode': mode });
-  console.log('New mode set:', mode);
-}
 
 // HTTP header modification based on the random profile in 'random' mode
 browser.webRequest.onBeforeSendHeaders.addListener(
@@ -124,8 +123,10 @@ browser.storage.local.get(['currentMode', 'randomProfile']).then(data => {
   }
   if (data.randomProfile) {
     randomProfile = data.randomProfile;
+  } else if (currentMode === 'random') {
+    randomProfile = generateRandomProfile();
+    browser.storage.local.set({ randomProfile: randomProfile });
   }
 });
 
 listenForMessages();
-
