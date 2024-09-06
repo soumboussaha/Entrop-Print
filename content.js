@@ -1,3 +1,5 @@
+
+
 console.log("Content script loaded successfully!");
 
 let entropyThreshold;
@@ -5,8 +7,9 @@ let entropies = {};
 let scriptCounts = { total: 0, firstParty: 0, thirdParty: 0 };
 let logs = [];
 let uniqueScripts = new Set();
-let randomProfile = {};
+let randomProfile = {}; // Store the random profile received from background.js
 
+// Function to get the current mode (random or entropy)
 function getCurrentMode() {
   return new Promise((resolve) => {
     browser.runtime.sendMessage({ getMode: true }, response => {
@@ -31,26 +34,18 @@ function requestEntropyThreshold() {
   });
 }
 
-function getEntropyData() {
+// Function to get random profile from background (userAgent, platform)
+function getRandomProfileFromBackground() {
   return new Promise((resolve, reject) => {
-    browser.storage.local.get('entropyData').then(data => {
-      if (data.entropyData) {
-        entropies = data.entropyData;
-        resolve();
+    browser.runtime.sendMessage({ action: "getRandomProfile" }, response => {
+      if (response && response.profile) {
+        randomProfile = response.profile;
+        console.log("Received random profile from background:", randomProfile);
+        resolve(randomProfile);
       } else {
-        reject('Failed to get entropy data from local storage');
+        reject("Failed to get random profile from background");
       }
     });
-  });
-}
-
-// Send the random profile to the background script
-function updateBackgroundWithRandomProfile(randomProfile) {
-  browser.runtime.sendMessage({
-    action: "setRandomProfile",
-    profile: randomProfile
-  }, response => {
-    console.log(response.status);  // Confirm if the background script received the profile
   });
 }
 
@@ -149,8 +144,12 @@ function injectMonitoringScript(threshold, entropies, mode) {
             const scriptSource = currentScript ? (currentScript.src || window.location.href) : window.location.href;
             if (reportAccess(objName + '.' + prop, scriptSource)) {
               if ("${mode}" === 'random') {
-                // In random mode, return a dynamic value from the random profile if entropy exceeds threshold
-                return randomProfile[objName + '.' + prop] || originalValue;
+                // Return platform and userAgent from background.js, randomize others
+                if (objName + '.' + prop === 'navigator.userAgent' || objName + '.' + prop === 'navigator.platform') {
+                  return randomProfile[objName + '.' + prop]; // Consistent across tabs
+                } else {
+                  return randomProfile[objName + '.' + prop] || originalValue; // Local randomization
+                }
               } else {
                 return originalValue;
               }
@@ -254,10 +253,9 @@ async function main() {
     const mode = await getCurrentMode();
     await requestEntropyThreshold();
 
-    // If random mode, generate the profile before injecting the script
+    // Get the consistent random profile (userAgent, platform) from background
     if (mode === 'random') {
-      randomProfile = generateRandomProfile();
-      updateBackgroundWithRandomProfile(randomProfile);  // Send the profile to background.js
+      await getRandomProfileFromBackground();
     }
 
     injectMonitoringScript(entropyThreshold, entropies, mode);
@@ -266,87 +264,7 @@ async function main() {
   }
 }
 
-// Random profile generation (unchanged from the previous version)
-function generateRandomProfile() {
-  const { platform, userAgent } = generateConsistentPlatformAndUserAgent();
-  return {
-    "screen.width": Math.floor(Math.random() * (1920 - 1024 + 1)) + 1024,
-    "screen.height": Math.floor(Math.random() * (1080 - 768 + 1)) + 768,
-    "navigator.userAgent": userAgent,
-    "navigator.platform": platform,
-    "HTMLCanvasElement.toDataURL": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/wcAAgEB/wliKwAAAABJRU5ErkJggg==",  // example for canvas
-    "storage.quota": Math.floor(Math.random() * 5000) + 1000,    // example for storage quota
-    "Permissions.state": "granted",                             // example for permissions
-    "HTMLElement.offsetHeight": Math.floor(Math.random() * 1000) + 300,
-    "HTMLElement.offsetWidth": Math.floor(Math.random() * 1000) + 300,
-    "navigator.language": generateRandomLanguage(),
-    "navigator.languages": generateRandomLanguages(),
-    "navigator.plugins": generateRandomPlugins(),
-    "WebGLRenderingContext.UNMASKED_RENDERER_WEBGL": generateRandomWebGLRenderer(),
-    "WebGLRenderingContext.UNMASKED_VENDOR_WEBGL": generateRandomWebGLVendor(),
-  };
-}
-
-function generateConsistentPlatformAndUserAgent() {
-  const browsers = [
-    { name: "Chrome", version: "91.0.4472.124", platform: "Win32", userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36" },
-    { name: "Firefox", version: "89.0", platform: "Linux x86_64", userAgent: "Mozilla/5.0 (X11; Linux x86_64; rv:89.0) Gecko/20100101 Firefox/89.0" },
-    { name: "Safari", version: "14.0", platform: "MacIntel", userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Safari/605.1.15" },
-    { name: "Edge", version: "91.0", platform: "Win32", userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36 Edg/91.0.864.59" }
-  ];
-  const randomBrowser = browsers[Math.floor(Math.random() * browsers.length)];
-  return { platform: randomBrowser.platform, userAgent: randomBrowser.userAgent };
-}
-
-function generateRandomLanguage() {
-  const languages = ["en-US", "fr-FR", "es-ES", "de-DE", "zh-CN"];
-  return languages[Math.floor(Math.random() * languages.length)];
-}
-
-function generateRandomLanguages() {
-  const languageOptions = [
-    ["en-US", "en"],
-    ["fr-FR", "fr"],
-    ["es-ES", "es"],
-    ["de-DE", "de"],
-    ["zh-CN", "zh"]
-  ];
-  return languageOptions[Math.floor(Math.random() * languageOptions.length)];
-}
-
-function generateRandomPlugins() {
-  const plugins = [
-    { name: "Shockwave Flash", filename: "flashplayer.xpt", description: "Shockwave Flash 32.0 r0" },
-    { name: "Chrome PDF Viewer", filename: "internal-pdf-viewer", description: "Portable Document Format" },
-    { name: "Widevine Content Decryption Module", filename: "widevinecdm.dll", description: "Content Decryption Module" },
-  ];
-  const randomPlugins = [];
-  const pluginCount = Math.floor(Math.random() * plugins.length);
-  for (let i = 0; i <= pluginCount; i++) {
-    randomPlugins.push(plugins[i]);
-  }
-  return randomPlugins;
-}
-
-function generateRandomWebGLRenderer() {
-  const renderers = ["ANGLE (Intel(R) UHD Graphics Direct3D11 vs_5_0 ps_5_0)", "AMD Radeon Pro 560X OpenGL Engine", "Apple M1"];
-  return renderers[Math.floor(Math.random() * renderers.length)];
-}
-
-function generateRandomWebGLVendor() {
-  const vendors = ["Google Inc.", "Intel Inc.", "ATI Technologies Inc."];
-  return vendors[Math.floor(Math.random() * vendors.length)];
-}
-
-// Listen for messages from the injected script
-window.addEventListener('message', function(event) {
-  if (event.data.type === 'FP_LOG') {
-    logs.push(event.data.data);
-    updateScriptCounts(event.data.data.scriptSource);
-  }
-});
-
-// Function to update script counts only when the entropy threshold is exceeded
+// Logging original functionalities
 function updateScriptCounts(scriptSource) {
   if (!uniqueScripts.has(scriptSource)) {
     uniqueScripts.add(scriptSource);
@@ -375,4 +293,3 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 main();
-
