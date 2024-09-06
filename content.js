@@ -33,24 +33,10 @@ function getCurrentMode() {
   });
 }
 
-// Function to request entropy threshold from the background script
-function requestEntropyThreshold() {
-  return new Promise((resolve, reject) => {
-    browser.runtime.sendMessage({ getEntropyThreshold: true }, response => {
-      if (response && response.threshold !== undefined) {
-        entropyThreshold = response.threshold;
-        console.log("Applied Entropy is " + response.threshold);
-        resolve();
-      } else {
-        reject('Failed to get entropy threshold');
-      }
-    });
-  });
-}
 
 function getEntropyData() {
   return new Promise((resolve, reject) => {
-    browser.storage.local.get('entropyData').then(data => {
+    browser.storage.local.get('entropyData', (data) => {
       if (data.entropyData) {
         entropies = data.entropyData;
         resolve();
@@ -60,6 +46,20 @@ function getEntropyData() {
     });
   });
 }
+
+function requestEntropyThreshold() {
+  return new Promise((resolve, reject) => {
+    browser.runtime.sendMessage({ getEntropyThreshold: true }, response => {
+      if (response && response.threshold !== undefined) {
+        entropyThreshold = response.threshold;
+        resolve();
+      } else {
+        reject('Failed to get entropy threshold');
+      }
+    });
+  });
+}
+
 
 // Function to inject the monitoring script and randomize properties
 function injectMonitoringScript(threshold, entropies, mode) {
