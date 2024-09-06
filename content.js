@@ -22,15 +22,15 @@ function getRandomProfileFromBackground() {
   });
 }
 
-
-
 function getCurrentMode() {
-    return new Promise((resolve) => {
-      browser.runtime.sendMessage({ getMode: true }, response => {
-        resolve(response.mode);
-      });
+  return new Promise((resolve) => {
+    browser.runtime.sendMessage({ getMode: true }, response => {
+      resolve(response.mode);
+      console.log("Applied Mode is " + response.mode);
     });
-  }
+  });
+}
+
 // Function to request entropy threshold from the background script
 function requestEntropyThreshold() {
   return new Promise((resolve, reject) => {
