@@ -1,6 +1,6 @@
 console.log("background is loaded!");
 
-let entropyThreshold = 0.5; // Default value
+let entropyThreshold = 0.83; // Default value
 let currentMode = 'entropy'; // Default mode: 'entropy' or 'random'
 let entropies = {};
 let randomProfile = {};
