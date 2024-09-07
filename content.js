@@ -228,7 +228,7 @@ function injectMonitoringScript(threshold, entropies, mode) {
       hookAllProperties(navigator, 'navigator');
       hookProperty(HTMLCanvasElement.prototype, 'toDataURL', 'HTMLCanvasElement');
       hookProperty(history, 'length', 'history');
-      hookProperty(WebGLShaderPrecisionFormat.prototype, 'precision', 'WebGLShaderPrecisionFormat');
+      //hookProperty(WebGLShaderPrecisionFormat.prototype, 'precision', 'WebGLShaderPrecisionFormat');
       hookProperty(WebGLShaderPrecisionFormat.prototype, 'rangeMax', 'WebGLShaderPrecisionFormat');
       hookProperty(WebGLShaderPrecisionFormat.prototype, 'rangeMin', 'WebGLShaderPrecisionFormat');
 
@@ -314,7 +314,7 @@ function generateRandomProfile() {
     "WebGLRenderingContext.UNMASKED_VENDOR_WEBGL": generateRandomWebGLVendor(),
     "fonts": generateRandomFonts(),  // Random fonts
     "AudioContext.sampleRate": Math.floor(Math.random() * (48000 - 44100 + 1)) + 44100, // Random sample rate
-    "AudioContext.baseLatency": Math.random().toFixed(5)  // Random base latency
+    "AudioContext.baseLatency": Math.random().toFixed(5),  // Random base latency
     "screen.availHeight": Math.floor(Math.random() * (1080 - 768 + 1)) + 768,
     "screen.availWidth": Math.floor(Math.random() * (1920 - 1024 + 1)) + 1024,
      "history.length":Math.floor(Math.random() * 50) + 1,
