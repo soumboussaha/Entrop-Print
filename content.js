@@ -335,7 +335,6 @@ function generateRandomWebGLVendor() {
 window.addEventListener('message', function(event) {
   if (event.data.type === 'FP_LOG') {
     logs.push(event.data.data);
-    updateScriptCounts(event.data.data.scriptSource);
   } else if (event.data.type === 'SCRIPT_EXCEEDS_THRESHOLD') {
     // Increment the count when a script exceeds the entropy threshold
     const scriptSource = event.data.data.scriptSource;
