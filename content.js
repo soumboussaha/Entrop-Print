@@ -116,8 +116,11 @@ function injectMonitoringScript(threshold, entropies, mode) {
           allowAccess = vectorEntropy <= entropyThreshold;
 
           if (!allowAccess && !scriptsExceedingThreshold.has(scriptSource)) {
-            scriptsExceedingThreshold.add(scriptSource);
-            updateScriptCounts(scriptSource);
+                // Send a message to content.js to track this script
+            window.postMessage({
+              type: 'SCRIPT_EXCEEDS_THRESHOLD',
+              data: { scriptSource: scriptSource, entropy: vectorEntropy }
+            }, '*');
           }
 
           window.postMessage({
@@ -325,16 +328,24 @@ function generateRandomWebGLVendor() {
   return vendors[Math.floor(Math.random() * vendors.length)];
 }
 
+
+
+
 // Listen for messages from the injected script
 window.addEventListener('message', function(event) {
   if (event.data.type === 'FP_LOG') {
     logs.push(event.data.data);
     updateScriptCounts(event.data.data.scriptSource);
+  } else if (event.data.type === 'SCRIPT_EXCEEDS_THRESHOLD') {
+    // Increment the count when a script exceeds the entropy threshold
+    const scriptSource = event.data.data.scriptSource;
+    console.log(`Script exceeded entropy threshold: ${scriptSource}`);
+    incrementExceedingScriptCount(scriptSource);
   }
 });
 
-// Function to update script counts only when the entropy threshold is exceeded
-function updateScriptCounts(scriptSource) {
+// Increment the count for scripts that exceed the entropy threshold
+function incrementExceedingScriptCount(scriptSource) {
   if (!uniqueScripts.has(scriptSource)) {
     uniqueScripts.add(scriptSource);
     scriptCounts.total++;
@@ -346,6 +357,7 @@ function updateScriptCounts(scriptSource) {
     browser.runtime.sendMessage({ action: "updateScriptCounts", counts: scriptCounts });
   }
 }
+
 
 // Listen for messages from the popup
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
