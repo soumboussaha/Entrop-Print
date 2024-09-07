@@ -246,6 +246,28 @@ function injectMonitoringScript(threshold, entropies, mode) {
       hookProperty(HTMLElement.prototype, 'offsetHeight', 'HTMLElement');
       hookProperty(HTMLElement.prototype, 'offsetWidth', 'HTMLElement');
 
+      
+      if (window.BaseAudioContext) {
+        hookProperty(BaseAudioContext.prototype, 'sampleRate', 'BaseAudioContext');
+        hookProperty(BaseAudioContext.prototype, 'currentTime', 'BaseAudioContext');
+        hookProperty(BaseAudioContext.prototype, 'state', 'BaseAudioContext');
+      }
+      if (window.AudioContext) {
+        hookProperty(AudioContext.prototype, 'baseLatency', 'AudioContext');
+        hookProperty(AudioContext.prototype, 'outputLatency', 'AudioContext');
+      }
+      if (window.AudioDestinationNode) {
+        hookProperty(AudioDestinationNode.prototype, 'maxChannelCount', 'AudioDestinationNode');
+      }
+      if (window.AudioNode) {
+        hookProperty(AudioNode.prototype, 'channelCount', 'AudioNode');
+        hookProperty(AudioNode.prototype, 'numberOfInputs', 'AudioNode');
+        hookProperty(AudioNode.prototype, 'numberOfOutputs', 'AudioNode');
+      }
+
+      // Hook Fonts
+      hookProperty(document, 'fonts', 'document');
+
     })();
   `;
 
@@ -293,6 +315,9 @@ function generateRandomProfile() {
     "fonts": generateRandomFonts(),  // Random fonts
     "AudioContext.sampleRate": Math.floor(Math.random() * (48000 - 44100 + 1)) + 44100, // Random sample rate
     "AudioContext.baseLatency": Math.random().toFixed(5)  // Random base latency
+    "screen.availHeight": Math.floor(Math.random() * (1080 - 768 + 1)) + 768,
+    "screen.availWidth": Math.floor(Math.random() * (1920 - 1024 + 1)) + 1024,
+     "history.length":Math.floor(Math.random() * 50) + 1,
   };
 }
 
