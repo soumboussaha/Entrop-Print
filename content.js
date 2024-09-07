@@ -138,7 +138,7 @@ function injectMonitoringScript(threshold, entropies, mode) {
         return false;
       }
 
-      function hookMethod(obj, method, objName) {
+     function hookMethod(obj, method, objName) {
         const originalMethod = obj[method];
         obj[method] = function() {
           const scripts = document.getElementsByTagName('script');
@@ -146,6 +146,8 @@ function injectMonitoringScript(threshold, entropies, mode) {
           const scriptSource = currentScript ? (currentScript.src || window.location.href) : window.location.href;
           if (reportAccess(objName + '.' + method, scriptSource)) {
             return originalMethod.apply(this, arguments);
+          } else {
+           // console.log('Blocked access to method:', objName + '.' + method);
           }
         };
       }
@@ -158,11 +160,7 @@ function injectMonitoringScript(threshold, entropies, mode) {
             const currentScript = scripts[scripts.length - 1];
             const scriptSource = currentScript ? (currentScript.src || window.location.href) : window.location.href;
             if (reportAccess(objName + '.' + prop, scriptSource)) {
-              if ("${mode}" === 'random') {
-                return randomProfile[objName + '.' + prop] || originalValue;
-              } else {
-                return originalValue;
-              }
+              return originalValue;
             } else {
               return undefined;
             }
@@ -187,48 +185,45 @@ function injectMonitoringScript(threshold, entropies, mode) {
         }
       }
 
-      function hookAllPropertieswebgl(obj, objName) {
-        const excludeProps = ['canvas', 'drawingBufferWidth', 'drawingBufferHeight'];
-        for (let prop in obj) {
-          if (!excludeProps.includes(prop) && typeof obj[prop] !== 'function') {
-            try {
-              if (objName.includes('WebGLRenderingContext') || objName.includes('WebGL2RenderingContext')) {
-                const descriptor = Object.getOwnPropertyDescriptor(obj, prop);
-                if (descriptor && descriptor.get) {
-                  const originalGetter = descriptor.get;
-                  Object.defineProperty(obj, prop, {
-                    get: function() {
-                      const scripts = document.getElementsByTagName('script');
-                      const currentScript = scripts[scripts.length - 1];
-                      const scriptSource = currentScript ? (currentScript.src || window.location.href) : window.location.href;
-                      if (reportAccess(objName + '.' + prop, scriptSource)) {
-                        if ("${mode}" === 'random') {
-                          return randomProfile[objName + '.' + prop] || originalGetter.call(this);
-                        } else {
-                          return originalGetter.call(this);
+    function hookAllPropertieswebgl(obj, objName) {
+            const excludeProps = ['canvas', 'drawingBufferWidth', 'drawingBufferHeight'];
+            for (let prop in obj) {
+                if (!excludeProps.includes(prop) && typeof obj[prop] !== 'function') {
+                try {
+                    // For WebGL properties, we need to use Object.getOwnPropertyDescriptor
+                    if (objName.includes('WebGLRenderingContext') || objName.includes('WebGL2RenderingContext')) {
+                    const descriptor = Object.getOwnPropertyDescriptor(obj, prop);
+                    if (descriptor && descriptor.get) {
+                        const originalGetter = descriptor.get;
+                        Object.defineProperty(obj, prop, {
+                        get: function() {
+                            const scripts = document.getElementsByTagName('script');
+                            const currentScript = scripts[scripts.length - 1];
+                            const scriptSource = currentScript ? (currentScript.src || window.location.href) : window.location.href;
+                            if (reportAccess(objName + '.' + prop, scriptSource)) {
+                            return originalGetter.call(this);
+                            } else {
+                            return undefined;
+                            }
                         }
-                      } else {
-                        return undefined;
-                      }
+                        });
                     }
-                  });
+                    } else {
+                    hookProperty(obj, prop, objName);
+                    }
+                } catch (error) {
+                    console.log(error);
                 }
-              } else {
-                hookProperty(obj, prop, objName);
-              }
-            } catch (error) {
-              console.log(error);
+                }
             }
-          }
-        }
-      }
+            }
 
       // Hook required properties
       hookAllProperties(screen, 'screen');
       hookAllProperties(navigator, 'navigator');
       hookProperty(HTMLCanvasElement.prototype, 'toDataURL', 'HTMLCanvasElement');
       hookProperty(history, 'length', 'history');
-      //hookProperty(WebGLShaderPrecisionFormat.prototype, 'precision', 'WebGLShaderPrecisionFormat');
+      hookProperty(WebGLShaderPrecisionFormat.prototype, 'precision', 'WebGLShaderPrecisionFormat');
       hookProperty(WebGLShaderPrecisionFormat.prototype, 'rangeMax', 'WebGLShaderPrecisionFormat');
       hookProperty(WebGLShaderPrecisionFormat.prototype, 'rangeMin', 'WebGLShaderPrecisionFormat');
 
