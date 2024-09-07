@@ -290,7 +290,16 @@ function generateRandomProfile() {
     "navigator.plugins": generateRandomPlugins(),
     "WebGLRenderingContext.UNMASKED_RENDERER_WEBGL": generateRandomWebGLRenderer(),
     "WebGLRenderingContext.UNMASKED_VENDOR_WEBGL": generateRandomWebGLVendor(),
+    "fonts": generateRandomFonts(),  // Random fonts
+    "AudioContext.sampleRate": Math.floor(Math.random() * (48000 - 44100 + 1)) + 44100, // Random sample rate
+    "AudioContext.baseLatency": Math.random().toFixed(5)  // Random base latency
   };
+}
+
+// Generate a random list of fonts
+function generateRandomFonts() {
+  const fonts = ["Arial", "Verdana", "Times New Roman", "Courier New", "Georgia", "Palatino", "Garamond", "Comic Sans MS"];
+  return fonts.slice(0, Math.floor(Math.random() * fonts.length) + 1);
 }
 
 function generateRandomLanguage() {
