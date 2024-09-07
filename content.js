@@ -86,6 +86,8 @@ function injectMonitoringScript(threshold, entropies, mode) {
         }
         return 0.99; // Default entropy if not found in the database
       }
+    
+      
 
       function logNewVector(attribute, vector, scriptSource, entropy) {
         const logEntry = \`\${new Date().toISOString()} - Last accessed attribute: \${attribute}, Vector: \${vector}, Script source: \${scriptSource}, Detected entropy: \${entropy}\\n\`;
@@ -109,7 +111,7 @@ function injectMonitoringScript(threshold, entropies, mode) {
           const vectorEntropy = calculateVectorEntropy(attributes, scriptSource);
           console.log(\`Detected entropy for vector [\${attributes.join("|")}] from script [\${scriptSource}]: \${vectorEntropy}\`);
 
-          logNewVector(attribute, attributes.join("|"), scriptSource, vectorEntropy);
+          //logNewVector(attribute, attributes.join("|"), scriptSource, vectorEntropy);
 
           allowAccess = vectorEntropy <= entropyThreshold;
 
