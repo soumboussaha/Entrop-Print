@@ -59,7 +59,19 @@ function requestEntropyThreshold() {
     });
   });
 }
-
+// Inject a script that stops the execution of the entire script when a threshold is exceeded
+function blockScriptExecution(scriptSource) {
+  const scriptContent = `
+    (function() {
+      const scripts = document.getElementsByTagName('script');
+      for (let script of scripts) {
+        if (script.src === "${scriptSource}") {
+          console.log('Blocking script due to exceeded entropy threshold:', script.src);
+          script.parentNode.removeChild(script);  // Remove the script element to stop it from running
+        }
+      }
+    })();
+  `;
 
 // Function to inject the monitoring script and randomize properties
 function injectMonitoringScript(threshold, entropies, mode) {
@@ -84,11 +96,10 @@ function injectMonitoringScript(threshold, entropies, mode) {
             }
           }
         }
-        return 0.99; // Default entropy if not found in the database
+        return 0.83; // Default entropy if not found in the database
       }
     
-      
-
+    
       function logNewVector(attribute, vector, scriptSource, entropy) {
         const logEntry = \`\${new Date().toISOString()} - Last accessed attribute: \${attribute}, Vector: \${vector}, Script source: \${scriptSource}, Detected entropy: \${entropy}\\n\`;
         fetch('http://localhost:8000/Logvectors.txt', {
@@ -100,7 +111,7 @@ function injectMonitoringScript(threshold, entropies, mode) {
         });
       }
 
-     function reportAccess(attribute, scriptSource) {
+ function reportAccess(attribute, scriptSource) {
         let allowAccess = false;
         if (attribute && scriptSource) {
           if (!attributeAccessData[scriptSource]) {
@@ -119,6 +130,7 @@ function injectMonitoringScript(threshold, entropies, mode) {
               type: 'SCRIPT_EXCEEDS_THRESHOLD',
               data: { scriptSource: scriptSource, entropy: vectorEntropy }
             }, '*');
+            return false;  // Block the access immediately
           }
 
           window.postMessage({
@@ -126,21 +138,19 @@ function injectMonitoringScript(threshold, entropies, mode) {
             data: { lastAttribute: attribute, vector: attributes.join("|"), scriptSource, webpage: window.location.href, timestamp: new Date().toISOString() }
           }, '*');
 
-          if (!allowAccess) {
-            if ("${mode}" === 'random') {
-              console.log('Randomizing access for attribute:', attribute, 'in random mode due to entropy exceeding threshold');
-              return true; // Randomize value
-            } else {
-              console.log('Blocking access for attribute:', attribute, 'due to entropy exceeding threshold');
-              return false; // Block access
-            }
+          if (!allowAccess && "${mode}" === 'random') {
+            console.log('Randomizing access for attribute:', attribute, 'in random mode due to entropy exceeding threshold');
+            return true; // Randomize value
+          } else if (!allowAccess) {
+            console.log('Blocking script due to exceeded entropy threshold');
+            return false; // Block the access
           }
 
           return allowAccess;
         }
         return false;
       }
-      
+
       function hookMethod(obj, method, objName) {
         const originalMethod = obj[method];
         obj[method] = function() {
