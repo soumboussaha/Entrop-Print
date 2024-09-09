@@ -222,6 +222,12 @@ function injectMonitoringScript(threshold, entropies, mode) {
           }
         }
       }
+    
+
+     // Hook storage.estimate to randomize quota
+      if (navigator.storage && navigator.storage.estimate) {
+        hookMethod(navigator.storage, 'estimate', 'navigator.storage.estimate');
+      }
 
       // Hook required properties
       hookAllProperties(screen, 'screen');
