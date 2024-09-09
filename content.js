@@ -138,7 +138,7 @@ function injectMonitoringScript(threshold, entropies, mode) {
         return false;
       }
 
-     function hookMethod(obj, method, objName) {
+      function hookMethod(obj, method, objName) {
         const originalMethod = obj[method];
         obj[method] = function() {
           const scripts = document.getElementsByTagName('script');
@@ -146,8 +146,6 @@ function injectMonitoringScript(threshold, entropies, mode) {
           const scriptSource = currentScript ? (currentScript.src || window.location.href) : window.location.href;
           if (reportAccess(objName + '.' + method, scriptSource)) {
             return originalMethod.apply(this, arguments);
-          } else {
-           // console.log('Blocked access to method:', objName + '.' + method);
           }
         };
       }
@@ -160,7 +158,11 @@ function injectMonitoringScript(threshold, entropies, mode) {
             const currentScript = scripts[scripts.length - 1];
             const scriptSource = currentScript ? (currentScript.src || window.location.href) : window.location.href;
             if (reportAccess(objName + '.' + prop, scriptSource)) {
-              return originalValue;
+              if ("${mode}" === 'random') {
+                return randomProfile[objName + '.' + prop] || originalValue;
+              } else {
+                return originalValue;
+              }
             } else {
               return undefined;
             }
@@ -185,47 +187,52 @@ function injectMonitoringScript(threshold, entropies, mode) {
         }
       }
 
-    function hookAllPropertieswebgl(obj, objName) {
-            const excludeProps = ['canvas', 'drawingBufferWidth', 'drawingBufferHeight'];
-            for (let prop in obj) {
-                if (!excludeProps.includes(prop) && typeof obj[prop] !== 'function') {
-                try {
-                    // For WebGL properties, we need to use Object.getOwnPropertyDescriptor
-                    if (objName.includes('WebGLRenderingContext') || objName.includes('WebGL2RenderingContext')) {
-                    const descriptor = Object.getOwnPropertyDescriptor(obj, prop);
-                    if (descriptor && descriptor.get) {
-                        const originalGetter = descriptor.get;
-                        Object.defineProperty(obj, prop, {
-                        get: function() {
-                            const scripts = document.getElementsByTagName('script');
-                            const currentScript = scripts[scripts.length - 1];
-                            const scriptSource = currentScript ? (currentScript.src || window.location.href) : window.location.href;
-                            if (reportAccess(objName + '.' + prop, scriptSource)) {
-                            return originalGetter.call(this);
-                            } else {
-                            return undefined;
-                            }
+      function hookAllPropertieswebgl(obj, objName) {
+        const excludeProps = ['canvas', 'drawingBufferWidth', 'drawingBufferHeight'];
+        for (let prop in obj) {
+          if (!excludeProps.includes(prop) && typeof obj[prop] !== 'function') {
+            try {
+              if (objName.includes('WebGLRenderingContext') || objName.includes('WebGL2RenderingContext')) {
+                const descriptor = Object.getOwnPropertyDescriptor(obj, prop);
+                if (descriptor && descriptor.get) {
+                  const originalGetter = descriptor.get;
+                  Object.defineProperty(obj, prop, {
+                    get: function() {
+                      const scripts = document.getElementsByTagName('script');
+                      const currentScript = scripts[scripts.length - 1];
+                      const scriptSource = currentScript ? (currentScript.src || window.location.href) : window.location.href;
+                      if (reportAccess(objName + '.' + prop, scriptSource)) {
+                        if ("${mode}" === 'random') {
+                          return randomProfile[objName + '.' + prop] || originalGetter.call(this);
+                        } else {
+                          return originalGetter.call(this);
                         }
-                        });
+                      } else {
+                        return undefined;
+                      }
                     }
-                    } else {
-                    hookProperty(obj, prop, objName);
-                    }
-                } catch (error) {
-                    console.log(error);
+                  });
                 }
-                }
+              } else {
+                hookProperty(obj, prop, objName);
+              }
+            } catch (error) {
+              console.log(error);
             }
-            }
+          }
+        }
+      }
 
       // Hook required properties
       hookAllProperties(screen, 'screen');
       hookAllProperties(navigator, 'navigator');
       hookProperty(HTMLCanvasElement.prototype, 'toDataURL', 'HTMLCanvasElement');
       hookProperty(history, 'length', 'history');
-      hookProperty(WebGLShaderPrecisionFormat.prototype, 'precision', 'WebGLShaderPrecisionFormat');
-      hookProperty(WebGLShaderPrecisionFormat.prototype, 'rangeMax', 'WebGLShaderPrecisionFormat');
-      hookProperty(WebGLShaderPrecisionFormat.prototype, 'rangeMin', 'WebGLShaderPrecisionFormat');
+
+      // to be fixed
+      //hookProperty(WebGLShaderPrecisionFormat.prototype, 'precision', 'WebGLShaderPrecisionFormat');
+      //hookProperty(WebGLShaderPrecisionFormat.prototype, 'rangeMax', 'WebGLShaderPrecisionFormat');
+      //hookProperty(WebGLShaderPrecisionFormat.prototype, 'rangeMin', 'WebGLShaderPrecisionFormat');
 
       if (window.WebGLRenderingContext) {
         hookAllPropertieswebgl(WebGLRenderingContext, 'WebGLRenderingContext');
@@ -234,18 +241,20 @@ function injectMonitoringScript(threshold, entropies, mode) {
         hookAllPropertieswebgl(WebGL2RenderingContext, 'WebGL2RenderingContext');
       }
 
-      hookProperty(storage, 'quota', 'storage');
+      //hookProperty(navigator.storage.estimate, 'quota', 'navigator.storage.estimate');
       if (window.Permissions) {
         hookProperty(Permissions.prototype, 'state', 'Permissions');
       }
-      hookProperty(HTMLElement.prototype, 'offsetHeight', 'HTMLElement');
-      hookProperty(HTMLElement.prototype, 'offsetWidth', 'HTMLElement');
+
+      // to fix
+      //hookProperty(HTMLElement.prototype, 'offsetHeight', 'HTMLElement');
+      //hookProperty(HTMLElement.prototype, 'offsetWidth', 'HTMLElement');
 
       
       if (window.BaseAudioContext) {
-        hookProperty(BaseAudioContext.prototype, 'sampleRate', 'BaseAudioContext');
-        hookProperty(BaseAudioContext.prototype, 'currentTime', 'BaseAudioContext');
-        hookProperty(BaseAudioContext.prototype, 'state', 'BaseAudioContext');
+        //hookProperty(BaseAudioContext.prototype, 'sampleRate', 'BaseAudioContext');
+        //hookProperty(BaseAudioContext.prototype, 'currentTime', 'BaseAudioContext');
+        //hookProperty(BaseAudioContext.prototype, 'state', 'BaseAudioContext');
       }
       if (window.AudioContext) {
         hookProperty(AudioContext.prototype, 'baseLatency', 'AudioContext');
@@ -298,7 +307,7 @@ function generateRandomProfile() {
     "screen.width": Math.floor(Math.random() * (1920 - 1024 + 1)) + 1024,
     "screen.height": Math.floor(Math.random() * (1080 - 768 + 1)) + 768,
     "HTMLCanvasElement.toDataURL": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/wcAAgEB/wliKwAAAABJRU5ErkJggg==",
-    "storage.quota": Math.floor(Math.random() * 5000) + 1000,
+    //"navigator.storage.estimate.quota": Math.floor(Math.random() * 5000) + 1000,
     "Permissions.state": "granted",
     "HTMLElement.offsetHeight": Math.floor(Math.random() * 1000) + 300,
     "HTMLElement.offsetWidth": Math.floor(Math.random() * 1000) + 300,
