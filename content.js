@@ -33,7 +33,6 @@ function getCurrentMode() {
   });
 }
 
-
 function getEntropyData() {
   return new Promise((resolve, reject) => {
     browser.storage.local.get('entropyData', (data) => {
@@ -59,6 +58,7 @@ function requestEntropyThreshold() {
     });
   });
 }
+
 // Inject a script that stops the execution of the entire script when a threshold is exceeded
 function blockScriptExecution(scriptSource) {
   const scriptContent = `
@@ -72,6 +72,11 @@ function blockScriptExecution(scriptSource) {
       }
     })();
   `;
+  const script = document.createElement('script');
+  script.textContent = scriptContent;
+  document.documentElement.appendChild(script);
+  script.remove();
+}
 
 // Function to inject the monitoring script and randomize properties
 function injectMonitoringScript(threshold, entropies, mode) {
@@ -99,7 +104,6 @@ function injectMonitoringScript(threshold, entropies, mode) {
         return 0.83; // Default entropy if not found in the database
       }
     
-    
       function logNewVector(attribute, vector, scriptSource, entropy) {
         const logEntry = \`\${new Date().toISOString()} - Last accessed attribute: \${attribute}, Vector: \${vector}, Script source: \${scriptSource}, Detected entropy: \${entropy}\\n\`;
         fetch('http://localhost:8000/Logvectors.txt', {
@@ -111,7 +115,7 @@ function injectMonitoringScript(threshold, entropies, mode) {
         });
       }
 
- function reportAccess(attribute, scriptSource) {
+      function reportAccess(attribute, scriptSource) {
         let allowAccess = false;
         if (attribute && scriptSource) {
           if (!attributeAccessData[scriptSource]) {
@@ -235,9 +239,8 @@ function injectMonitoringScript(threshold, entropies, mode) {
           }
         }
       }
-    
 
-     // Hook storage.estimate to randomize quota
+      // Hook storage.estimate to randomize quota
       if (navigator.storage && navigator.storage.estimate) {
         hookMethod(navigator.storage, 'estimate', 'navigator.storage.estimate');
       }
@@ -248,10 +251,10 @@ function injectMonitoringScript(threshold, entropies, mode) {
       hookProperty(HTMLCanvasElement.prototype, 'toDataURL', 'HTMLCanvasElement');
       hookProperty(history, 'length', 'history');
 
-      // to be fixed
-      //hookProperty(WebGLShaderPrecisionFormat.prototype, 'precision', 'WebGLShaderPrecisionFormat');
-      //hookProperty(WebGLShaderPrecisionFormat.prototype, 'rangeMax', 'WebGLShaderPrecisionFormat');
-      //hookProperty(WebGLShaderPrecisionFormat.prototype, 'rangeMin', 'WebGLShaderPrecisionFormat');
+      // Fix WebGLShaderPrecisionFormat issues
+      hookProperty(WebGLShaderPrecisionFormat.prototype, 'precision', 'WebGLShaderPrecisionFormat');
+      hookProperty(WebGLShaderPrecisionFormat.prototype, 'rangeMax', 'WebGLShaderPrecisionFormat');
+      hookProperty(WebGLShaderPrecisionFormat.prototype, 'rangeMin', 'WebGLShaderPrecisionFormat');
 
       if (window.WebGLRenderingContext) {
         hookAllPropertieswebgl(WebGLRenderingContext, 'WebGLRenderingContext');
@@ -260,36 +263,21 @@ function injectMonitoringScript(threshold, entropies, mode) {
         hookAllPropertieswebgl(WebGL2RenderingContext, 'WebGL2RenderingContext');
       }
 
-      //hookProperty(navigator.storage.estimate, 'quota', 'navigator.storage.estimate');
-      if (window.Permissions) {
-        hookProperty(Permissions.prototype, 'state', 'Permissions');
-      }
+      // Hook Fonts
+      hookProperty(document, 'fonts', 'document');
 
-      // to fix
-      //hookProperty(HTMLElement.prototype, 'offsetHeight', 'HTMLElement');
-      //hookProperty(HTMLElement.prototype, 'offsetWidth', 'HTMLElement');
+      // Hook HTMLElement.offsetHeight and offsetWidth
+      hookProperty(HTMLElement.prototype, 'offsetHeight', 'HTMLElement');
+      hookProperty(HTMLElement.prototype, 'offsetWidth', 'HTMLElement');
 
-      
-      if (window.BaseAudioContext) {
-        //hookProperty(BaseAudioContext.prototype, 'sampleRate', 'BaseAudioContext');
-        //hookProperty(BaseAudioContext.prototype, 'currentTime', 'BaseAudioContext');
-        //hookProperty(BaseAudioContext.prototype, 'state', 'BaseAudioContext');
-      }
       if (window.AudioContext) {
         hookProperty(AudioContext.prototype, 'baseLatency', 'AudioContext');
         hookProperty(AudioContext.prototype, 'outputLatency', 'AudioContext');
       }
+
       if (window.AudioDestinationNode) {
         hookProperty(AudioDestinationNode.prototype, 'maxChannelCount', 'AudioDestinationNode');
       }
-      if (window.AudioNode) {
-        hookProperty(AudioNode.prototype, 'channelCount', 'AudioNode');
-        hookProperty(AudioNode.prototype, 'numberOfInputs', 'AudioNode');
-        hookProperty(AudioNode.prototype, 'numberOfOutputs', 'AudioNode');
-      }
-
-      // Hook Fonts
-      hookProperty(document, 'fonts', 'document');
 
     })();
   `;
@@ -326,7 +314,6 @@ function generateRandomProfile() {
     "screen.width": Math.floor(Math.random() * (1920 - 1024 + 1)) + 1024,
     "screen.height": Math.floor(Math.random() * (1080 - 768 + 1)) + 768,
     "HTMLCanvasElement.toDataURL": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/wcAAgEB/wliKwAAAABJRU5ErkJggg==",
-    //"navigator.storage.estimate.quota": Math.floor(Math.random() * 5000) + 1000,
     "Permissions.state": "granted",
     "HTMLElement.offsetHeight": Math.floor(Math.random() * 1000) + 300,
     "HTMLElement.offsetWidth": Math.floor(Math.random() * 1000) + 300,
@@ -335,12 +322,12 @@ function generateRandomProfile() {
     "navigator.plugins": generateRandomPlugins(),
     "WebGLRenderingContext.UNMASKED_RENDERER_WEBGL": generateRandomWebGLRenderer(),
     "WebGLRenderingContext.UNMASKED_VENDOR_WEBGL": generateRandomWebGLVendor(),
-    "fonts": generateRandomFonts(),  // Random fonts
-    "AudioContext.sampleRate": Math.floor(Math.random() * (48000 - 44100 + 1)) + 44100, // Random sample rate
-    "AudioContext.baseLatency": Math.random().toFixed(5),  // Random base latency
+    "fonts": generateRandomFonts(),
+    "AudioContext.sampleRate": Math.floor(Math.random() * (48000 - 44100 + 1)) + 44100,
+    "AudioContext.baseLatency": Math.random().toFixed(5),
     "screen.availHeight": Math.floor(Math.random() * (1080 - 768 + 1)) + 768,
     "screen.availWidth": Math.floor(Math.random() * (1920 - 1024 + 1)) + 1024,
-     "history.length":Math.floor(Math.random() * 50) + 1,
+    "history.length": Math.floor(Math.random() * 50) + 1,
   };
 }
 
@@ -385,9 +372,6 @@ function generateRandomWebGLVendor() {
   return vendors[Math.floor(Math.random() * vendors.length)];
 }
 
-
-
-
 // Listen for messages from the injected script
 window.addEventListener('message', function(event) {
   if (event.data.type === 'FP_LOG') {
@@ -414,7 +398,6 @@ function incrementExceedingScriptCount(scriptSource) {
     browser.runtime.sendMessage({ action: "updateScriptCounts", counts: scriptCounts });
   }
 }
-
 
 // Listen for messages from the popup
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
