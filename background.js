@@ -142,16 +142,10 @@ function listenForMessages() {
   });
 }
 
-// Initialize mode from storage and random profile
-browser.storage.local.get(['currentMode', 'randomProfile']).then(data => {
+// Initialize mode from storage
+browser.storage.local.get('currentMode').then(data => {
   if (data.currentMode) {
     currentMode = data.currentMode;
-  }
-  if (data.randomProfile) {
-    randomProfile = data.randomProfile;
-  } else if (currentMode === 'random') {
-    randomProfile = generateRandomProfile();
-    browser.storage.local.set({ randomProfile: randomProfile });
   }
 });
 
