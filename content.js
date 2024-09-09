@@ -397,6 +397,7 @@ window.addEventListener('message', function(event) {
     const scriptSource = event.data.data.scriptSource;
     console.log(`Script exceeded entropy threshold: ${scriptSource}`);
     incrementExceedingScriptCount(scriptSource);
+    blockScriptExecution(scriptSource);  // Block script execution once it exceeds threshold
   }
 });
 
