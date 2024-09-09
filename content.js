@@ -100,7 +100,7 @@ function injectMonitoringScript(threshold, entropies, mode) {
         });
       }
 
-      function reportAccess(attribute, scriptSource) {
+     function reportAccess(attribute, scriptSource) {
         let allowAccess = false;
         if (attribute && scriptSource) {
           if (!attributeAccessData[scriptSource]) {
@@ -111,12 +111,10 @@ function injectMonitoringScript(threshold, entropies, mode) {
           const vectorEntropy = calculateVectorEntropy(attributes, scriptSource);
           console.log(\`Detected entropy for vector [\${attributes.join("|")}] from script [\${scriptSource}]: \${vectorEntropy}\`);
 
-          //logNewVector(attribute, attributes.join("|"), scriptSource, vectorEntropy);
-
           allowAccess = vectorEntropy <= entropyThreshold;
 
           if (!allowAccess && !scriptsExceedingThreshold.has(scriptSource)) {
-                // Send a message to content.js to track this script
+            scriptsExceedingThreshold.add(scriptSource);
             window.postMessage({
               type: 'SCRIPT_EXCEEDS_THRESHOLD',
               data: { scriptSource: scriptSource, entropy: vectorEntropy }
@@ -128,16 +126,21 @@ function injectMonitoringScript(threshold, entropies, mode) {
             data: { lastAttribute: attribute, vector: attributes.join("|"), scriptSource, webpage: window.location.href, timestamp: new Date().toISOString() }
           }, '*');
 
-          if (!allowAccess && "${mode}" === 'random') {
-            console.log('Randomizing access for attribute:', attribute, 'in random mode due to entropy exceeding threshold');
-            return true;
+          if (!allowAccess) {
+            if ("${mode}" === 'random') {
+              console.log('Randomizing access for attribute:', attribute, 'in random mode due to entropy exceeding threshold');
+              return true; // Randomize value
+            } else {
+              console.log('Blocking access for attribute:', attribute, 'due to entropy exceeding threshold');
+              return false; // Block access
+            }
           }
 
           return allowAccess;
         }
         return false;
       }
-
+      
       function hookMethod(obj, method, objName) {
         const originalMethod = obj[method];
         obj[method] = function() {
