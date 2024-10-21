@@ -26,6 +26,14 @@ async function getRandomProfileFromBackground() {
   }
 }
 
+browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === "getLogs") {
+    sendResponse({ logs: logs.map(log => `${log.timestamp} - ${log.lastAttribute} : ${log.scriptSource} : ${log.webpage}`).join('\n') });
+    return true; // Indicates that the response is sent asynchronously
+  }
+});
+
+
 // Function to get the current mode from the background script
 async function getCurrentMode() {
   try {
