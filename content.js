@@ -117,21 +117,110 @@ function injectMonitoringScript(threshold, entropies, mode) {
       let randomProfile = ${JSON.stringify(randomProfile)};
       let scriptsExceedingThreshold = new Set();
 
-      function calculateVectorEntropy(attributes, scriptSource) {
-        function normalizeVector(vector) {
-          return vector.split('|').map(attr => attr.trim()).sort().join('|');
-        }
-        const normalizedAttributes = normalizeVector(attributes.join('|'));
-        for (const key in entropyValues) {
-          if (entropyValues.hasOwnProperty(key)) {
-            const normalizedKey = normalizeVector(key);
-            if (normalizedKey === normalizedAttributes) {
-              return entropyValues[key];
+   /**
+ * Calculates the entropy of a given attribute vector.
+ * If the full vector is not found in the entropyValues database,
+ * it searches for entropy values of all possible sub-vectors.
+ * If no matching entropy is found, it returns a default value.
+ *
+ * @param {Array<string>} attributes - The array of attribute names.
+ * @param {string} scriptSource - The source URL of the script (currently unused).
+ * @returns {number} - The calculated entropy value.
+ */
+function calculateVectorEntropy(attributes, scriptSource) {
+    /**
+     * Normalizes a vector by trimming whitespace, sorting the attributes,
+     * and joining them into a standardized string.
+     *
+     * @param {string} vector - The attribute vector as a string separated by '|'.
+     * @returns {string} - The normalized vector string.
+     */
+    function normalizeVector(vector) {
+        return vector
+            .split('|')
+            .map(attr => attr.trim())
+            .filter(attr => attr.length > 0) // Remove any empty strings
+            .sort() // Sort attributes alphabetically for consistent ordering
+            .join('|');
+    }
+
+    /**
+     * Generates all combinations of a specific size from the given array.
+     *
+     * @param {Array<string>} array - The array of attributes.
+     * @param {number} size - The size of each combination.
+     * @returns {Array<Array<string>>} - An array of attribute combinations.
+     */
+    function getCombinations(array, size) {
+        const results = [];
+
+        /**
+         * Helper function to build combinations recursively.
+         *
+         * @param {number} start - The starting index for combinations.
+         * @param {Array<string>} combo - The current combination being built.
+         */
+        function combine(start, combo) {
+            if (combo.length === size) {
+                results.push([...combo]);
+                return;
             }
-          }
+            for (let i = start; i < array.length; i++) {
+                combo.push(array[i]);
+                combine(i + 1, combo);
+                combo.pop();
+            }
         }
-        return 0.83; // Default entropy if not found in the database
-      }
+
+        combine(0, []);
+        return results;
+    }
+
+    /**
+     * Attempts to find the entropy value for a given attribute combination.
+     *
+     * @param {Array<string>} attrs - The array of attributes.
+     * @returns {number|null} - The found entropy value or null if not found.
+     */
+    function findEntropy(attrs) {
+        const normalized = normalizeVector(attrs.join('|'));
+        if (entropyValues.hasOwnProperty(normalized)) {
+            console.log(`Entropy found for vector: "${normalized}"`);
+            return entropyValues[normalized];
+        }
+        return null;
+    }
+
+    // Normalize the full attribute vector
+    const normalizedFullVector = normalizeVector(attributes.join('|'));
+    console.log(`Normalized Full Vector: "${normalizedFullVector}"`);
+
+    // Attempt to find entropy for the full vector
+    const fullEntropy = findEntropy(attributes);
+    if (fullEntropy !== null) {
+        return fullEntropy;
+    }
+
+    console.warn('Full attribute vector not found. Searching for sub-vectors...');
+
+    // Iterate over possible sub-vector sizes, starting from n-1 down to 1
+    for (let size = attributes.length - 1; size >= 1; size--) {
+        const combinations = getCombinations(attributes, size);
+        console.log(`Checking ${combinations.length} combinations of size ${size}...`);
+
+        for (const combo of combinations) {
+            const entropy = findEntropy(combo);
+            if (entropy !== null) {
+                console.log(`Entropy found for sub-vector: "${normalizeVector(combo.join('|'))}"`);
+                return entropy;
+            }
+        }
+    }
+
+    console.warn('No matching entropy found for any sub-vector. Using default entropy value.');
+    return 0.83; // Default entropy value
+}
+
 
       function logNewVector(attribute, vector, scriptSource, entropy) {
         const logEntry = \`\${new Date().toISOString()} - Last accessed attribute: \${attribute}, Vector: \${vector}, Script source: \${scriptSource}, Detected entropy: \${entropy}\\n\`;
