@@ -1,3 +1,5 @@
+// popup.js
+
 document.addEventListener('DOMContentLoaded', function() {
   const entropySlider = document.getElementById('entropy-slider');
   const entropyValue = document.getElementById('entropy-value');
@@ -14,14 +16,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Function to update entropy threshold
   function updateEntropyThreshold(value) {
-    currentThreshold = value; // Invert the value
+    currentThreshold = parseFloat(value); // Ensure it's a number
     let blockingLevel = "High";
     if (value < 0.442) blockingLevel = "Negligible";
     else if (value < 0.596) blockingLevel = "Low";
     else if (value < 0.705) blockingLevel = "Medium";
     else if (value < 0.832) blockingLevel = "High";
     else blockingLevel = "Very High";
-    
+
     entropyValue.textContent = `Blocking Level: ${value} - ${blockingLevel}`;
     browser.runtime.sendMessage({ setEntropyThreshold: currentThreshold });
   }
@@ -58,7 +60,17 @@ document.addEventListener('DOMContentLoaded', function() {
   downloadLogsBtn.addEventListener('click', function() {
     // Request logs from content script
     browser.tabs.query({active: true, currentWindow: true}, function(tabs) {
+      if (tabs.length === 0) {
+        console.error("No active tab found.");
+        return;
+      }
+
       browser.tabs.sendMessage(tabs[0].id, {action: "getLogs"}, function(response) {
+        if (browser.runtime.lastError) {
+          console.error("Error sending message to content script:", browser.runtime.lastError);
+          return;
+        }
+
         if (response && response.logs) {
           // Create and download the log file
           const blob = new Blob([response.logs], {type: 'text/plain'});
@@ -70,6 +82,9 @@ document.addEventListener('DOMContentLoaded', function() {
           a.click();
           document.body.removeChild(a);
           URL.revokeObjectURL(url);
+          console.log("Logs downloaded successfully.");
+        } else {
+          console.error("No logs received from content script.");
         }
       });
     });
@@ -82,30 +97,51 @@ document.addEventListener('DOMContentLoaded', function() {
     thirdPartyScripts.textContent = counts.thirdParty;
   }
 
-
   // Request initial script counts from content script
   browser.tabs.query({active: true, currentWindow: true}, function(tabs) {
+    if (tabs.length === 0) {
+      console.error("No active tab found.");
+      return;
+    }
+
     browser.tabs.sendMessage(tabs[0].id, {action: "getScriptCounts"}, function(response) {
+      if (browser.runtime.lastError) {
+        console.error("Error sending message to content script:", browser.runtime.lastError);
+        return;
+      }
+
       if (response && response.counts) {
         updateScriptCounts(response.counts);
+      } else {
+        console.error("No script counts received from content script.");
       }
     });
   });
 
   // Request initial entropy threshold and mode from background script
   browser.runtime.sendMessage({ getEntropyThreshold: true }, function(response) {
+    if (browser.runtime.lastError) {
+      console.error("Error sending message to background script:", browser.runtime.lastError);
+      return;
+    }
+
     if (response && response.threshold !== undefined) {
-      currentThreshold = response.threshold;
+      currentThreshold = parseFloat(response.threshold);
       entropySlider.value = currentThreshold;
       entropyValue.textContent = `Entropy Threshold: ${currentThreshold}`;
+    } else {
+      console.error("No entropy threshold received from background script.");
     }
   });
 
   browser.runtime.sendMessage({ getMode: true }, function(response) {
+    if (browser.runtime.lastError) {
+      console.error("Error sending message to background script:", browser.runtime.lastError);
+      return;
+    }
+
     if (response && response.mode) {
-      if (response.mode === 'random') {
-        entropyControls.style.display = 'block';
-      } else {
+      if (response.mode === 'random' || response.mode === 'entropy') {
         entropyControls.style.display = 'block';
       }
     }
