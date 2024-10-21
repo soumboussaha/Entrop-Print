@@ -97,6 +97,10 @@ function blockScriptExecution(scriptSource) {
 // Function to inject the monitoring script and randomize properties
 function injectMonitoringScript(threshold, entropies, mode) {
   console.log("Injecting monitoring script with threshold:", threshold, "and mode:", mode);
+  
+  // Safely stringify mode to handle quotes and special characters
+  const modeString = JSON.stringify(mode);
+  
   const scriptContent = `
     (function() {
       let entropyValues = ${JSON.stringify(entropies)};
@@ -159,7 +163,7 @@ function injectMonitoringScript(threshold, entropies, mode) {
             data: { lastAttribute: attribute, vector: attributes.join("|"), scriptSource, webpage: window.location.href, timestamp: new Date().toISOString() }
           }, '*');
 
-          if (!allowAccess && "${mode}" === 'random') {
+          if (!allowAccess && ${modeString} === 'random') {
             console.log('Randomizing access for attribute:', attribute, 'in random mode due to entropy exceeding threshold');
             return true; // Randomize value
           } else if (!allowAccess) {
@@ -192,7 +196,7 @@ function injectMonitoringScript(threshold, entropies, mode) {
             const currentScript = scripts[scripts.length - 1];
             const scriptSource = currentScript ? (currentScript.src || window.location.href) : window.location.href;
             if (reportAccess(objName + '.' + prop, scriptSource)) {
-              if ("${mode}" === 'random') {
+              if (${modeString} === 'random') {
                 return randomProfile[objName + '.' + prop] || originalValue;
               } else {
                 return originalValue;
@@ -236,7 +240,7 @@ function injectMonitoringScript(threshold, entropies, mode) {
                       const currentScript = scripts[scripts.length - 1];
                       const scriptSource = currentScript ? (currentScript.src || window.location.href) : window.location.href;
                       if (reportAccess(objName + '.' + prop, scriptSource)) {
-                        if ("${mode}" === 'random') {
+                        if (${modeString} === 'random') {
                           return randomProfile[objName + '.' + prop] || originalGetter.call(this);
                         } else {
                           return originalGetter.call(this);
@@ -251,7 +255,7 @@ function injectMonitoringScript(threshold, entropies, mode) {
                 hookProperty(obj, prop, objName);
               }
             } catch (error) {
-              console.error(`Error hooking property ${prop} of ${objName}:`, error);
+              console.error(\`Error hooking property \${prop} of \${objName}:\`, error);
             }
           }
         }
@@ -434,7 +438,7 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   } else if (message.action === "applyEntropyBlocking") {
     entropyThreshold = message.threshold;
     console.log("Applying entropy blocking with threshold:", entropyThreshold);
-    injectMonitoringScript(entropyThreshold, entropies, "entropy");
+    injectMonitoringScript(entropyThreshold, entropies, "entropy");  // Pass "entropy" as mode
   } else if (message.action === "getScriptCounts") {
     sendResponse({ counts: scriptCounts });
   } else if (message.action === "getLogs") {
@@ -448,7 +452,7 @@ function applyRandomProfile() {
   const generatedProfile = generateRandomProfile();
   randomProfile = { ...randomProfile, ...generatedProfile };
   console.log("Random profile applied:", randomProfile);
-  injectMonitoringScript(entropyThreshold, entropies, "random");
+  injectMonitoringScript(entropyThreshold, entropies, "random");  // Pass "random" as mode
 }
 
 // Main execution
