@@ -102,26 +102,33 @@ function blockScriptExecution(scriptSource) {
   console.log('Block script injected for:', scriptSource);
 }
 
-// Function to inject the monitoring script and randomize properties
-function injectMonitoringScript(threshold, entropies, mode) {
+function injectMonitoringScript(threshold, entropies, mode, randomProfile) {
   console.log("Injecting monitoring script with threshold:", threshold, "and mode:", mode);
   
-  // Safely stringify mode to handle quotes and special characters
+  // Safely stringify mode, entropies, and randomProfile to handle quotes and special characters
   const modeString = JSON.stringify(mode);
-  
-  // Stringify the entropies and randomProfile
   const entropyValuesString = JSON.stringify(entropies);
   const randomProfileString = JSON.stringify(randomProfile);
   
-  // Define the script content using a function to avoid template literal conflicts
+  // Build the script content using single quotes and concatenated strings to avoid nested template literals
   const scriptContent = `
     (function() {
-      let entropyValues = ${entropyValuesString};
-      let entropyThreshold = ${threshold};
-      let attributeAccessData = {};
-      let randomProfile = ${randomProfileString};
-      let scriptsExceedingThreshold = new Set();
+      var entropyValues = ${entropyValuesString};
+      var entropyThreshold = ${threshold};
+      var attributeAccessData = {};
+      var randomProfile = ${randomProfileString};
+      var scriptsExceedingThreshold = new Set();
 
+      /**
+       * Calculates the entropy of a given attribute vector.
+       * If the full vector is not found in the entropyValues database,
+       * it searches for entropy values of all possible sub-vectors.
+       * If no matching entropy is found, it returns a default value.
+       *
+       * @param {Array<string>} attributes - The array of attribute names.
+       * @param {string} scriptSource - The source URL of the script (currently unused).
+       * @returns {number} - The calculated entropy value.
+       */
       function calculateVectorEntropy(attributes, scriptSource) {
           function normalizeVector(vector) {
               return vector
