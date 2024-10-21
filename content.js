@@ -109,259 +109,224 @@ function injectMonitoringScript(threshold, entropies, mode) {
   // Safely stringify mode to handle quotes and special characters
   const modeString = JSON.stringify(mode);
   
+  // Stringify the entropies and randomProfile
+  const entropyValuesString = JSON.stringify(entropies);
+  const randomProfileString = JSON.stringify(randomProfile);
+  
+  // Define the script content using a function to avoid template literal conflicts
   const scriptContent = `
     (function() {
-      let entropyValues = ${JSON.stringify(entropies)};
+      let entropyValues = ${entropyValuesString};
       let entropyThreshold = ${threshold};
       let attributeAccessData = {};
-      let randomProfile = ${JSON.stringify(randomProfile)};
+      let randomProfile = ${randomProfileString};
       let scriptsExceedingThreshold = new Set();
 
-   /**
- * Calculates the entropy of a given attribute vector.
- * If the full vector is not found in the entropyValues database,
- * it searches for entropy values of all possible sub-vectors.
- * If no matching entropy is found, it returns a default value.
- *
- * @param {Array<string>} attributes - The array of attribute names.
- * @param {string} scriptSource - The source URL of the script (currently unused).
- * @returns {number} - The calculated entropy value.
- */
-function calculateVectorEntropy(attributes, scriptSource) {
-    /**
-     * Normalizes a vector by trimming whitespace, sorting the attributes,
-     * and joining them into a standardized string.
-     *
-     * @param {string} vector - The attribute vector as a string separated by '|'.
-     * @returns {string} - The normalized vector string.
-     */
-    function normalizeVector(vector) {
-        return vector
-            .split('|')
-            .map(function(attr) { return attr.trim(); })
-            .filter(function(attr) { return attr.length > 0; }) // Remove any empty strings
-            .sort() // Sort attributes alphabetically for consistent ordering
-            .join('|');
-    }
+      function calculateVectorEntropy(attributes, scriptSource) {
+          function normalizeVector(vector) {
+              return vector
+                  .split('|')
+                  .map(function(attr) { return attr.trim(); })
+                  .filter(function(attr) { return attr.length > 0; }) // Remove any empty strings
+                  .sort() // Sort attributes alphabetically for consistent ordering
+                  .join('|');
+          }
 
-    /**
-     * Generates all combinations of a specific size from the given array.
-     *
-     * @param {Array<string>} array - The array of attributes.
-     * @param {number} size - The size of each combination.
-     * @returns {Array<Array<string>>} - An array of attribute combinations.
-     */
-    function getCombinations(array, size) {
-        var results = [];
+          function getCombinations(array, size) {
+              var results = [];
 
-        /**
-         * Helper function to build combinations recursively.
-         *
-         * @param {number} start - The starting index for combinations.
-         * @param {Array<string>} combo - The current combination being built.
-         */
-        function combine(start, combo) {
-            if (combo.length === size) {
-                results.push(combo.slice());
-                return;
-            }
-            for (var i = start; i < array.length; i++) {
-                combo.push(array[i]);
-                combine(i + 1, combo);
-                combo.pop();
-            }
-        }
+              function combine(start, combo) {
+                  if (combo.length === size) {
+                      results.push(combo.slice());
+                      return;
+                  }
+                  for (var i = start; i < array.length; i++) {
+                      combo.push(array[i]);
+                      combine(i + 1, combo);
+                      combo.pop();
+                  }
+              }
 
-        combine(0, []);
-        return results;
-    }
+              combine(0, []);
+              return results;
+          }
 
-    /**
-     * Attempts to find the entropy value for a given attribute combination.
-     *
-     * @param {Array<string>} attrs - The array of attributes.
-     * @returns {number|null} - The found entropy value or null if not found.
-     */
-    function findEntropy(attrs) {
-        var normalized = normalizeVector(attrs.join('|'));
-        if (entropyValues.hasOwnProperty(normalized)) {
-            console.log('Entropy found for vector: "' + normalized + '"');
-            return entropyValues[normalized];
-        }
-        return null;
-    }
+          function findEntropy(attrs) {
+              var normalized = normalizeVector(attrs.join('|'));
+              if (entropyValues.hasOwnProperty(normalized)) {
+                  console.log('Entropy found for vector: "' + normalized + '"');
+                  return entropyValues[normalized];
+              }
+              return null;
+          }
 
-    // Normalize the full attribute vector
-    var normalizedFullVector = normalizeVector(attributes.join('|'));
-    console.log('Normalized Full Vector: "' + normalizedFullVector + '"');
+          var normalizedFullVector = normalizeVector(attributes.join('|'));
+          console.log('Normalized Full Vector: "' + normalizedFullVector + '"');
 
-    // Attempt to find entropy for the full vector
-    var fullEntropy = findEntropy(attributes);
-    if (fullEntropy !== null) {
-        return fullEntropy;
-    }
+          var fullEntropy = findEntropy(attributes);
+          if (fullEntropy !== null) {
+              return fullEntropy;
+          }
 
-    console.warn('Full attribute vector not found. Searching for sub-vectors...');
+          console.warn('Full attribute vector not found. Searching for sub-vectors...');
 
-    // Iterate over possible sub-vector sizes, starting from n-1 down to 1
-    for (var size = attributes.length - 1; size >= 1; size--) {
-        var combinations = getCombinations(attributes, size);
-        console.log('Checking ' + combinations.length + ' combinations of size ' + size + '...');
+          for (var size = attributes.length - 1; size >= 1; size--) {
+              var combinations = getCombinations(attributes, size);
+              console.log('Checking ' + combinations.length + ' combinations of size ' + size + '...');
 
-        for (var i = 0; i < combinations.length; i++) {
-            var combo = combinations[i];
-            var entropy = findEntropy(combo);
-            if (entropy !== null) {
-                console.log('Entropy found for sub-vector: "' + normalizeVector(combo.join('|')) + '"');
-                return entropy;
-            }
-        }
-    }
+              for (var i = 0; i < combinations.length; i++) {
+                  var combo = combinations[i];
+                  var entropy = findEntropy(combo);
+                  if (entropy !== null) {
+                      console.log('Entropy found for sub-vector: "' + normalizeVector(combo.join('|')) + '"');
+                      return entropy;
+                  }
+              }
+          }
 
-    console.warn('No matching entropy found for any sub-vector. Using default entropy value.');
-    return 0.83; // Default entropy value
-}
-
+          console.warn('No matching entropy found for any sub-vector. Using default entropy value.');
+          return 0.83; // Default entropy value
+      }
 
       function logNewVector(attribute, vector, scriptSource, entropy) {
-        const logEntry = \`\${new Date().toISOString()} - Last accessed attribute: \${attribute}, Vector: \${vector}, Script source: \${scriptSource}, Detected entropy: \${entropy}\\n\`;
-        fetch('http://localhost:8000/Logvectors.txt', {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain' },
-          body: logEntry
-        }).catch(error => {
-          console.error('Error logging vector:', error);
-        });
+          var logEntry = new Date().toISOString() + ' - Last accessed attribute: ' + attribute + ', Vector: ' + vector + ', Script source: ' + scriptSource + ', Detected entropy: ' + entropy + '\\n';
+          fetch('http://localhost:8000/Logvectors.txt', {
+              method: 'POST',
+              headers: { 'Content-Type': 'text/plain' },
+              body: logEntry
+          }).catch(function(error) {
+              console.error('Error logging vector:', error);
+          });
       }
 
       function reportAccess(attribute, scriptSource) {
-        let allowAccess = false;
-        if (attribute && scriptSource) {
-          if (!attributeAccessData[scriptSource]) {
-            attributeAccessData[scriptSource] = new Set();
+          var allowAccess = false;
+          if (attribute && scriptSource) {
+              if (!attributeAccessData[scriptSource]) {
+                  attributeAccessData[scriptSource] = new Set();
+              }
+              attributeAccessData[scriptSource].add(attribute);
+              var attributes = Array.from(attributeAccessData[scriptSource]);
+              var vectorEntropy = calculateVectorEntropy(attributes, scriptSource);
+              console.log('Detected entropy for vector [' + attributes.join("|") + '] from script [' + scriptSource + ']: ' + vectorEntropy);
+
+              allowAccess = vectorEntropy <= entropyThreshold;
+
+              if (!allowAccess && !scriptsExceedingThreshold.has(scriptSource)) {
+                  scriptsExceedingThreshold.add(scriptSource);
+                  window.postMessage({
+                      type: 'SCRIPT_EXCEEDS_THRESHOLD',
+                      data: { scriptSource: scriptSource, entropy: vectorEntropy }
+                  }, '*');
+                  return false;  // Block the access immediately
+              }
+
+              window.postMessage({
+                  type: 'FP_LOG',
+                  data: { lastAttribute: attribute, vector: attributes.join("|"), scriptSource: scriptSource, webpage: window.location.href, timestamp: new Date().toISOString() }
+              }, '*');
+
+              if (!allowAccess && ${modeString} === 'random') {
+                  console.log('Randomizing access for attribute:', attribute, 'in random mode due to entropy exceeding threshold');
+                  return true; // Randomize value
+              } else if (!allowAccess) {
+                  console.log('Blocking script due to exceeded entropy threshold');
+                  return false; // Block the access
+              }
+
+              return allowAccess;
           }
-          attributeAccessData[scriptSource].add(attribute);
-          const attributes = Array.from(attributeAccessData[scriptSource]);
-          const vectorEntropy = calculateVectorEntropy(attributes, scriptSource);
-          console.log(\`Detected entropy for vector [\${attributes.join("|")}] from script [\${scriptSource}]: \${vectorEntropy}\`);
-
-          allowAccess = vectorEntropy <= entropyThreshold;
-
-          if (!allowAccess && !scriptsExceedingThreshold.has(scriptSource)) {
-            scriptsExceedingThreshold.add(scriptSource);
-            window.postMessage({
-              type: 'SCRIPT_EXCEEDS_THRESHOLD',
-              data: { scriptSource: scriptSource, entropy: vectorEntropy }
-            }, '*');
-            return false;  // Block the access immediately
-          }
-
-          window.postMessage({
-            type: 'FP_LOG',
-            data: { lastAttribute: attribute, vector: attributes.join("|"), scriptSource, webpage: window.location.href, timestamp: new Date().toISOString() }
-          }, '*');
-
-          if (!allowAccess && ${modeString} === 'random') {
-            console.log('Randomizing access for attribute:', attribute, 'in random mode due to entropy exceeding threshold');
-            return true; // Randomize value
-          } else if (!allowAccess) {
-            console.log('Blocking script due to exceeded entropy threshold');
-            return false; // Block the access
-          }
-
-          return allowAccess;
-        }
-        return false;
+          return false;
       }
 
       function hookMethod(obj, method, objName) {
-        const originalMethod = obj[method];
-        obj[method] = function() {
-          const scripts = document.getElementsByTagName('script');
-          const currentScript = scripts[scripts.length - 1];
-          const scriptSource = currentScript ? (currentScript.src || window.location.href) : window.location.href;
-          if (reportAccess(objName + '.' + method, scriptSource)) {
-            return originalMethod.apply(this, arguments);
-          }
-        };
+          var originalMethod = obj[method];
+          obj[method] = function() {
+              var scripts = document.getElementsByTagName('script');
+              var currentScript = scripts[scripts.length - 1];
+              var scriptSource = currentScript ? (currentScript.src || window.location.href) : window.location.href;
+              if (reportAccess(objName + '.' + method, scriptSource)) {
+                  return originalMethod.apply(this, arguments);
+              }
+          };
       }
 
       function hookProperty(obj, prop, objName) {
-        let originalValue = obj[prop];
-        Object.defineProperty(obj, prop, {
-          get: function() {
-            const scripts = document.getElementsByTagName('script');
-            const currentScript = scripts[scripts.length - 1];
-            const scriptSource = currentScript ? (currentScript.src || window.location.href) : window.location.href;
-            if (reportAccess(objName + '.' + prop, scriptSource)) {
-              if (${modeString} === 'random') {
-                return randomProfile[objName + '.' + prop] || originalValue;
-              } else {
-                return originalValue;
-              }
-            } else {
-              return undefined;
-            }
-          },
-          set: function(value) {
-            const scripts = document.getElementsByTagName('script');
-            const currentScript = scripts[scripts.length - 1];
-            const scriptSource = currentScript ? (currentScript.src || window.location.href) : window.location.href;
-            if (reportAccess(objName + '.' + prop, scriptSource)) {
-              originalValue = value;
-            }
-          },
-          configurable: true
-        });
+          var originalValue = obj[prop];
+          Object.defineProperty(obj, prop, {
+              get: function() {
+                  var scripts = document.getElementsByTagName('script');
+                  var currentScript = scripts[scripts.length - 1];
+                  var scriptSource = currentScript ? (currentScript.src || window.location.href) : window.location.href;
+                  if (reportAccess(objName + '.' + prop, scriptSource)) {
+                      if (${modeString} === 'random') {
+                          return randomProfile[objName + '.' + prop] || originalValue;
+                      } else {
+                          return originalValue;
+                      }
+                  } else {
+                      return undefined;
+                  }
+              },
+              set: function(value) {
+                  var scripts = document.getElementsByTagName('script');
+                  var currentScript = scripts[scripts.length - 1];
+                  var scriptSource = currentScript ? (currentScript.src || window.location.href) : window.location.href;
+                  if (reportAccess(objName + '.' + prop, scriptSource)) {
+                      originalValue = value;
+                  }
+              },
+              configurable: true
+          });
       }
 
       function hookAllProperties(obj, objName) {
-        for (let prop in obj) {
-          if (typeof obj[prop] !== 'function') {
-            hookProperty(obj, prop, objName);
+          for (var prop in obj) {
+              if (typeof obj[prop] !== 'function') {
+                  hookProperty(obj, prop, objName);
+              }
           }
-        }
       }
 
       function hookAllPropertieswebgl(obj, objName) {
-        const excludeProps = ['canvas', 'drawingBufferWidth', 'drawingBufferHeight'];
-        for (let prop in obj) {
-          if (!excludeProps.includes(prop) && typeof obj[prop] !== 'function') {
-            try {
-              if (objName.includes('WebGLRenderingContext') || objName.includes('WebGL2RenderingContext')) {
-                const descriptor = Object.getOwnPropertyDescriptor(obj, prop);
-                if (descriptor && descriptor.get) {
-                  const originalGetter = descriptor.get;
-                  Object.defineProperty(obj, prop, {
-                    get: function() {
-                      const scripts = document.getElementsByTagName('script');
-                      const currentScript = scripts[scripts.length - 1];
-                      const scriptSource = currentScript ? (currentScript.src || window.location.href) : window.location.href;
-                      if (reportAccess(objName + '.' + prop, scriptSource)) {
-                        if (${modeString} === 'random') {
-                          return randomProfile[objName + '.' + prop] || originalGetter.call(this);
-                        } else {
-                          return originalGetter.call(this);
-                        }
+          var excludeProps = ['canvas', 'drawingBufferWidth', 'drawingBufferHeight'];
+          for (var prop in obj) {
+              if (!excludeProps.includes(prop) && typeof obj[prop] !== 'function') {
+                  try {
+                      if (objName.includes('WebGLRenderingContext') || objName.includes('WebGL2RenderingContext')) {
+                          var descriptor = Object.getOwnPropertyDescriptor(obj, prop);
+                          if (descriptor && descriptor.get) {
+                              var originalGetter = descriptor.get;
+                              Object.defineProperty(obj, prop, {
+                                  get: function() {
+                                      var scripts = document.getElementsByTagName('script');
+                                      var currentScript = scripts[scripts.length - 1];
+                                      var scriptSource = currentScript ? (currentScript.src || window.location.href) : window.location.href;
+                                      if (reportAccess(objName + '.' + prop, scriptSource)) {
+                                          if (${modeString} === 'random') {
+                                              return randomProfile[objName + '.' + prop] || originalGetter.call(this);
+                                          } else {
+                                              return originalGetter.call(this);
+                                          }
+                                      } else {
+                                          return undefined;
+                                      }
+                                  }
+                              });
+                          }
                       } else {
-                        return undefined;
+                          hookProperty(obj, prop, objName);
                       }
-                    }
-                  });
-                }
-              } else {
-                hookProperty(obj, prop, objName);
+                  } catch (error) {
+                      console.error('Error hooking property ' + prop + ' of ' + objName + ':', error);
+                  }
               }
-            } catch (error) {
-              console.error(\`Error hooking property \${prop} of \${objName}:\`, error);
-            }
           }
-        }
       }
 
       // Hook storage.estimate to randomize quota
       if (navigator.storage && navigator.storage.estimate) {
-        hookMethod(navigator.storage, 'estimate', 'navigator.storage.estimate');
+          hookMethod(navigator.storage, 'estimate', 'navigator.storage.estimate');
       }
 
       // Hook required properties
@@ -376,10 +341,10 @@ function calculateVectorEntropy(attributes, scriptSource) {
       hookProperty(WebGLShaderPrecisionFormat.prototype, 'rangeMin', 'WebGLShaderPrecisionFormat');
 
       if (window.WebGLRenderingContext) {
-        hookAllPropertieswebgl(WebGLRenderingContext, 'WebGLRenderingContext');
+          hookAllPropertieswebgl(WebGLRenderingContext, 'WebGLRenderingContext');
       }
       if (window.WebGL2RenderingContext) {
-        hookAllPropertieswebgl(WebGL2RenderingContext, 'WebGL2RenderingContext');
+          hookAllPropertieswebgl(WebGL2RenderingContext, 'WebGL2RenderingContext');
       }
 
       // Hook Fonts
@@ -391,17 +356,18 @@ function calculateVectorEntropy(attributes, scriptSource) {
 
       // Hook AudioContext properties
       if (window.AudioContext) {
-        hookProperty(AudioContext.prototype, 'baseLatency', 'AudioContext');
-        hookProperty(AudioContext.prototype, 'outputLatency', 'AudioContext');
+          hookProperty(AudioContext.prototype, 'baseLatency', 'AudioContext');
+          hookProperty(AudioContext.prototype, 'outputLatency', 'AudioContext');
       }
 
       if (window.AudioDestinationNode) {
-        hookProperty(AudioDestinationNode.prototype, 'maxChannelCount', 'AudioDestinationNode');
+          hookProperty(AudioDestinationNode.prototype, 'maxChannelCount', 'AudioDestinationNode');
       }
 
     })();
   `;
 
+  // Create a script element and inject it into the page
   const script = document.createElement('script');
   script.textContent = scriptContent;
   document.documentElement.appendChild(script);
