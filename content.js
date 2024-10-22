@@ -216,6 +216,9 @@ function injectMonitoringScript(threshold, entropies, mode, randomProfile) {
               var attributes = Array.from(attributeAccessData[scriptSource]);
               var vectorEntropy = calculateVectorEntropy(attributes, scriptSource);
               console.log('Detected entropy for vector [' + attributes.join("|") + '] from script [' + scriptSource + ']: ' + vectorEntropy);
+               // **Call logNewVector here**
+            logNewVector(attribute, attributes.join('|'), scriptSource, vectorEntropy);
+
 
               allowAccess = vectorEntropy <= entropyThreshold;
 
