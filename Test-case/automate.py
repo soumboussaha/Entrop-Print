@@ -200,7 +200,7 @@ def open_links_in_firefox(
 if __name__ == "__main__":
     # Define your configurations
     configurations = [
-        {"mode": "entropy", "threshold": 1, "log_url": "url_log_1.txt", "log_console": "console_log_1.txt"},
+        {"mode": "entropy", "threshold": 1.9, "log_url": "url_log_1.9.txt", "log_console": "console_log_1.9.txt"},
         {"mode": "entropy", "threshold": 0.83, "log_url": "url_log_0.83.txt", "log_console": "console_log_0.83.txt"},
         {"mode": "entropy", "threshold": 0.705, "log_url": "url_log_0.705.txt", "log_console": "console_log_0.705.txt"},
         {"mode": "entropy", "threshold": 0.596, "log_url": "url_log_0.596.txt", "log_console": "console_log_0.596.txt"},
@@ -264,4 +264,3 @@ if __name__ == "__main__":
         print(f"--- Completed crawling with mode: {mode}, threshold: {threshold} ---")
     
     print("\nAll configurations have been processed.")
-
