@@ -21,10 +21,10 @@ from selenium.webdriver.support import expected_conditions as EC
 
 # Configure logging
 logging.basicConfig(
-    level=logging.DEBUG,  # Set to DEBUG to capture all levels of logs
+    level=logging.DEBUG,  # Capture all levels of logs
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.StreamHandler()  # Logs will be printed to the console
+        logging.StreamHandler()  # Output logs to the console
     ]
 )
 logger = logging.getLogger(__name__)
@@ -42,12 +42,17 @@ def package_extension(extension_dir, output_path):
     """
     try:
         with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as xpi:
+            logger.debug(f"Packaging extension from {extension_dir} to {output_path}")
             for root, dirs, files in os.walk(extension_dir):
                 for file in files:
                     file_path = os.path.join(root, file)
                     # Compute the relative path to maintain directory structure
                     relative_path = os.path.relpath(file_path, extension_dir)
-                    xpi.write(file_path, relative_path)
+                    try:
+                        xpi.write(file_path, relative_path)
+                        logger.debug(f"Added to .xpi: {relative_path}")
+                    except Exception as file_e:
+                        logger.error(f"Failed to add {relative_path} to .xpi: {file_e}")
         logger.info(f"Extension packaged as .xpi at: {output_path}")
     except Exception as e:
         logger.error(f"Failed to package extension: {e}")
@@ -197,6 +202,7 @@ def open_links_in_firefox(
     options = Options()
     options.headless = True  # Set to False if you want to see the browser
     options.add_extension(packaged_extension_path)
+    logger.debug(f"Added extension: {packaged_extension_path}")
     
     if firefox_binary_path:
         options.binary_location = firefox_binary_path
