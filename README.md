@@ -1,4 +1,4 @@
-# Trackers Blocker Firefox Extension
+# Entroshield Firefox Extension
 
 ## Overview
 
